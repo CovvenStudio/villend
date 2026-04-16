@@ -212,7 +212,7 @@ const ApplicationForm = ({ property }: Props) => {
       </AnimatePresence>
 
       {/* Progress indicator */}
-      {step !== 'done' && step !== 'submitting' && (
+      {step !== ('done' as Step) && step !== ('submitting' as Step) && (
         <div className="flex justify-center gap-1.5 pt-2">
           {['personal', 'financial', 'details'].map((s) => (
             <div

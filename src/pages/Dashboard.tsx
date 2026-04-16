@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Home, Users, Plus, Settings, LogOut, Building2, Eye, Trash2, Calendar, CheckCircle, XCircle, Clock, Star, AlertTriangle, ChevronDown } from 'lucide-react';
+import { Home, Users, Plus, Settings, LogOut, Building2, Eye, Calendar, CheckCircle, XCircle, Clock, Star, AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
