@@ -4,68 +4,69 @@ import { Link2, FileCheck, BarChart3, CalendarCheck, Shield, Zap } from 'lucide-
 const features = [
   {
     icon: Link2,
-    title: 'Criar via link',
-    description: 'Cole o link do Idealista e o sistema extrai automaticamente todas as informações do imóvel.',
+    title: 'Importar via link',
+    description: 'Cole o URL do Idealista. Extraímos automaticamente título, preço, fotos e descrição.',
   },
   {
     icon: FileCheck,
     title: 'Formulário inteligente',
-    description: 'Candidatos respondem apenas perguntas relevantes. Sem conta, sem fricção — em menos de 60 segundos.',
+    description: 'Candidatos respondem apenas o relevante. Sem conta, sem fricção — menos de 60 segundos.',
   },
   {
     icon: BarChart3,
     title: 'Scoring automático',
-    description: 'Cada candidato recebe um score de 0 a 100 baseado em renda, estabilidade e adequação ao imóvel.',
+    description: 'Score de 0 a 100 baseado em renda, estabilidade profissional e adequação ao imóvel.',
   },
   {
     icon: CalendarCheck,
     title: 'Agendamento direto',
-    description: 'Candidatos aprovados escolhem horários disponíveis. Sem troca de mensagens, sem confusão.',
+    description: 'Candidatos aprovados escolhem horários. Sem troca de mensagens, sem confusão.',
   },
   {
     icon: Shield,
-    title: 'Critérios personalizáveis',
-    description: 'Defina renda mínima, caução, fiador e mais. O formulário adapta-se dinamicamente às suas regras.',
+    title: 'Critérios dinâmicos',
+    description: 'Renda mínima, caução, fiador — o formulário adapta-se automaticamente às suas regras.',
   },
   {
     icon: Zap,
     title: 'Dashboard centralizado',
-    description: 'Veja todos os candidatos ordenados por score com status em tempo real. Decida em segundos.',
+    description: 'Candidatos ordenados por score, status em tempo real. Decida em segundos.',
   },
 ];
 
 const Features = () => {
   return (
-    <section className="py-24 md:py-32">
+    <section className="py-28 md:py-36">
       <div className="container mx-auto px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="text-center mb-16"
+          className="text-center mb-20"
         >
-          <h2 className="font-display text-3xl md:text-4xl font-bold tracking-tight mb-4">
-            Tudo o que precisa, nada que não precisa
+          <p className="text-xs font-medium tracking-[0.2em] uppercase text-accent mb-4">Funcionalidades</p>
+          <h2 className="font-display text-3xl md:text-[2.75rem] font-700 tracking-tight mb-5 leading-tight">
+            Tudo o que precisa.<br className="hidden md:block" /> Nada que não precisa.
           </h2>
-          <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-            Uma camada inteligente sobre os seus anúncios. Sem substituir os sistemas que já usa.
+          <p className="text-muted-foreground text-base max-w-md mx-auto leading-relaxed">
+            Uma camada inteligente sobre os seus anúncios existentes.
           </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
           {features.map((feature, i) => (
             <motion.div
               key={feature.title}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 16 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: i * 0.08 }}
-              className="group p-6 rounded-2xl border bg-card hover:shadow-lg hover:shadow-primary/5 transition-all duration-300"
+              transition={{ delay: i * 0.06 }}
+              className="group p-7 rounded-2xl border bg-card hover:shadow-xl hover:shadow-primary/[0.03] transition-all duration-500"
             >
-              <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center mb-4 group-hover:bg-accent/20 transition-colors">
-                <feature.icon className="w-5 h-5 text-accent" />
+              <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center mb-5 group-hover:bg-accent/15 transition-colors duration-300">
+                <feature.icon className="w-[18px] h-[18px] text-accent" />
               </div>
-              <h3 className="font-display text-lg font-semibold mb-2">{feature.title}</h3>
+              <h3 className="font-display text-base font-600 mb-2">{feature.title}</h3>
               <p className="text-muted-foreground text-sm leading-relaxed">{feature.description}</p>
             </motion.div>
           ))}

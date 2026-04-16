@@ -10,15 +10,15 @@ import AddPropertyDialog from '@/components/dashboard/AddPropertyDialog';
 
 const statusConfig: Record<Candidate['status'], { label: string; icon: typeof Clock; className: string }> = {
   new: { label: 'Novo', icon: Clock, className: 'bg-muted text-muted-foreground' },
-  approved: { label: 'Aprovado', icon: CheckCircle, className: 'bg-score-excellent/10 text-score-excellent' },
+  approved: { label: 'Aprovado', icon: CheckCircle, className: 'bg-score-excellent text-score-excellent' },
   rejected: { label: 'Rejeitado', icon: XCircle, className: 'bg-destructive/10 text-destructive' },
   visit_scheduled: { label: 'Visita agendada', icon: Calendar, className: 'bg-accent/10 text-accent' },
 };
 
-const classificationConfig: Record<Candidate['classification'], { label: string; icon: typeof Star; className: string }> = {
-  excellent: { label: 'Excelente', icon: Star, className: 'score-excellent' },
-  potential: { label: 'Potencial', icon: AlertTriangle, className: 'score-potential' },
-  low: { label: 'Baixa', icon: AlertTriangle, className: 'score-low' },
+const classificationConfig: Record<Candidate['classification'], { label: string; className: string }> = {
+  excellent: { label: 'Excelente', className: 'score-excellent' },
+  potential: { label: 'Potencial', className: 'score-potential' },
+  low: { label: 'Baixa', className: 'score-low' },
 };
 
 const Dashboard = () => {
@@ -38,17 +38,15 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background flex">
       {/* Sidebar */}
-      <aside className="w-64 border-r bg-card hidden lg:flex flex-col">
+      <aside className="w-60 border-r bg-card hidden lg:flex flex-col">
         <div className="p-5 border-b">
-          <Link to="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Home className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="font-display text-lg font-bold">Arrendou</span>
+          <Link to="/" className="flex items-center gap-1">
+            <span className="font-display text-lg font-700 tracking-tight">domu</span>
+            <span className="text-accent text-lg">.</span>
           </Link>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-3 space-y-0.5">
           <SidebarItem icon={Building2} label="Imóveis" active />
           <SidebarItem icon={Users} label="Candidatos" />
           <SidebarItem icon={Calendar} label="Visitas" />
@@ -56,7 +54,7 @@ const Dashboard = () => {
         </nav>
 
         <div className="p-4 border-t">
-          <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full">
+          <button className="flex items-center gap-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors w-full px-3 py-2">
             <LogOut className="w-4 h-4" />
             Sair
           </button>
@@ -65,35 +63,35 @@ const Dashboard = () => {
 
       {/* Main content */}
       <main className="flex-1 overflow-auto">
-        <div className="p-6 lg:p-8 max-w-6xl">
+        <div className="p-6 lg:p-10 max-w-6xl">
           {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
             <div>
-              <h1 className="font-display text-2xl font-bold">Dashboard</h1>
+              <h1 className="font-display text-2xl font-700 tracking-tight">Imóveis</h1>
               <p className="text-sm text-muted-foreground mt-1">Gerir imóveis e candidatos</p>
             </div>
-            <Button onClick={() => setShowAddProperty(true)} className="rounded-lg font-semibold">
+            <Button onClick={() => setShowAddProperty(true)} className="rounded-xl font-semibold text-sm h-10 px-5">
               <Plus className="w-4 h-4 mr-2" />
               Adicionar imóvel
             </Button>
           </div>
 
           {/* Property selector */}
-          <div className="flex gap-3 mb-8 overflow-x-auto pb-2">
+          <div className="flex gap-3 mb-10 overflow-x-auto pb-2 -mx-1 px-1">
             {mockProperties.map((p) => (
               <button
                 key={p.id}
                 onClick={() => setSelectedProperty(p.id)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-left shrink-0 transition-all ${
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-left shrink-0 transition-all duration-300 ${
                   selectedProperty === p.id
-                    ? 'border-primary bg-primary/5 shadow-sm'
-                    : 'hover:border-primary/30'
+                    ? 'border-primary/20 bg-card shadow-sm'
+                    : 'border-transparent hover:border-border hover:bg-card/50'
                 }`}
               >
-                <img src={p.images[0]} alt="" className="w-12 h-12 rounded-lg object-cover" />
+                <img src={p.images[0]} alt="" className="w-11 h-11 rounded-lg object-cover" />
                 <div>
                   <div className="text-sm font-semibold truncate max-w-[180px]">{p.title}</div>
-                  <div className="text-xs text-muted-foreground">€{p.price}/mês</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">€{p.price}/mês</div>
                 </div>
               </button>
             ))}
@@ -101,34 +99,32 @@ const Dashboard = () => {
 
           {/* Stats */}
           {property && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
               {[
-                { label: 'Total candidatos', value: propertyCandidates.length },
+                { label: 'Total', value: propertyCandidates.length },
                 { label: 'Excelentes', value: propertyCandidates.filter(c => c.classification === 'excellent').length },
                 { label: 'Aprovados', value: propertyCandidates.filter(c => c.status === 'approved' || c.status === 'visit_scheduled').length },
-                { label: 'Visitas agendadas', value: propertyCandidates.filter(c => c.status === 'visit_scheduled').length },
+                { label: 'Visitas', value: propertyCandidates.filter(c => c.status === 'visit_scheduled').length },
               ].map((stat) => (
-                <div key={stat.label} className="p-4 rounded-xl border bg-card">
-                  <div className="text-2xl font-display font-bold">{stat.value}</div>
+                <div key={stat.label} className="p-5 rounded-xl border bg-card">
+                  <div className="text-2xl font-display font-700 tracking-tight">{stat.value}</div>
                   <div className="text-xs text-muted-foreground mt-1">{stat.label}</div>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Candidate table */}
-          <div className="rounded-xl border bg-card overflow-hidden">
-            <div className="p-4 border-b flex items-center justify-between">
-              <h2 className="font-display font-semibold">Candidatos</h2>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>{propertyCandidates.length} resultados</span>
-              </div>
+          {/* Candidate list */}
+          <div className="rounded-2xl border bg-card overflow-hidden">
+            <div className="px-6 py-4 border-b flex items-center justify-between">
+              <h2 className="font-display font-600 text-sm">Candidatos</h2>
+              <span className="text-xs text-muted-foreground">{propertyCandidates.length} resultados</span>
             </div>
 
             {propertyCandidates.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground">
-                <Users className="w-8 h-8 mx-auto mb-3 opacity-40" />
-                <p className="text-sm">Ainda sem candidatos para este imóvel</p>
+              <div className="p-16 text-center text-muted-foreground">
+                <Users className="w-7 h-7 mx-auto mb-3 opacity-30" />
+                <p className="text-sm">Ainda sem candidatos</p>
               </div>
             ) : (
               <div className="divide-y">
@@ -141,12 +137,12 @@ const Dashboard = () => {
                       key={candidate.id}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      transition={{ delay: i * 0.05 }}
-                      className="p-4 hover:bg-muted/30 transition-colors"
+                      transition={{ delay: i * 0.04 }}
+                      className="px-6 py-4 hover:bg-muted/30 transition-colors duration-200"
                     >
                       <div className="flex items-center gap-4">
                         {/* Score */}
-                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-display font-bold text-lg shrink-0 ${
+                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-display font-700 text-sm shrink-0 ${
                           candidate.classification === 'excellent' ? 'bg-score-excellent' :
                           candidate.classification === 'potential' ? 'bg-score-potential' :
                           'bg-score-low'
@@ -158,15 +154,15 @@ const Dashboard = () => {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-sm">{candidate.name}</span>
-                            <span className={`text-xs font-medium ${cls.className}`}>{cls.label}</span>
+                            <span className={`text-[11px] font-medium ${cls.className}`}>{cls.label}</span>
                           </div>
                           <div className="text-xs text-muted-foreground mt-0.5">
-                            €{candidate.monthlyIncome}/mês · {candidate.numberOfPeople} pessoa(s) · {candidate.employmentType === 'permanent' ? 'Contrato sem termo' : candidate.employmentType}
+                            €{candidate.monthlyIncome}/mês · {candidate.numberOfPeople} pessoa(s)
                           </div>
                         </div>
 
                         {/* Status */}
-                        <Badge variant="secondary" className={`${st.className} text-xs shrink-0`}>
+                        <Badge variant="secondary" className={`${st.className} text-[11px] shrink-0 font-medium`}>
                           <st.icon className="w-3 h-3 mr-1" />
                           {st.label}
                         </Badge>
@@ -190,8 +186,7 @@ const Dashboard = () => {
                                 className="h-8 text-xs text-destructive hover:text-destructive"
                                 onClick={() => updateCandidateStatus(candidate.id, 'rejected')}
                               >
-                                <XCircle className="w-3.5 h-3.5 mr-1" />
-                                Rejeitar
+                                <XCircle className="w-3.5 h-3.5" />
                               </Button>
                             </>
                           )}
@@ -217,14 +212,14 @@ const Dashboard = () => {
 
           {/* Property link */}
           {property && (
-            <div className="mt-6 p-4 rounded-xl border bg-muted/30 flex items-center justify-between">
+            <div className="mt-6 p-5 rounded-xl border bg-card flex items-center justify-between">
               <div>
-                <div className="text-xs text-muted-foreground mb-1">Link público do imóvel</div>
-                <code className="text-sm font-mono">/p/{property.slug}</code>
+                <div className="text-xs text-muted-foreground mb-1">Link público</div>
+                <code className="text-sm font-mono text-muted-foreground">/p/{property.slug}</code>
               </div>
               <Link to={`/p/${property.slug}`}>
-                <Button variant="outline" size="sm" className="rounded-lg">
-                  <Eye className="w-3.5 h-3.5 mr-1" />
+                <Button variant="outline" size="sm" className="rounded-lg text-xs">
+                  <Eye className="w-3.5 h-3.5 mr-1.5" />
                   Ver página
                 </Button>
               </Link>
@@ -239,8 +234,12 @@ const Dashboard = () => {
 };
 
 const SidebarItem = ({ icon: Icon, label, active }: { icon: typeof Home; label: string; active?: boolean }) => (
-  <button className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm w-full transition-colors ${active ? 'bg-primary/5 text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}`}>
-    <Icon className="w-4 h-4" />
+  <button className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm w-full transition-all duration-200 ${
+    active
+      ? 'bg-primary/[0.04] text-foreground font-medium'
+      : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+  }`}>
+    <Icon className="w-[18px] h-[18px]" />
     {label}
   </button>
 );
