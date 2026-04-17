@@ -33,7 +33,7 @@ const PropertyPage = () => {
             <span className="hidden sm:inline">Voltar</span>
           </Link>
           <div className="flex items-center gap-1">
-            <span className="font-display text-sm font-700">domu</span>
+            <span className="font-display text-sm font-700">vyllad</span>
             <span className="text-accent text-sm">.</span>
           </div>
         </div>

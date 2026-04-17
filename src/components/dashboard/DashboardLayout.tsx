@@ -22,7 +22,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       <aside className="w-60 border-r bg-card hidden lg:flex flex-col fixed h-screen">
         <div className="p-5 border-b">
           <Link to="/" className="flex items-center gap-1">
-            <span className="font-display text-lg font-700 tracking-tight">domu</span>
+            <span className="font-display text-lg font-700 tracking-tight">vyllad</span>
             <span className="text-accent text-lg">.</span>
           </Link>
         </div>

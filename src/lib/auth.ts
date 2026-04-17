@@ -1,5 +1,5 @@
 // Mock auth using localStorage. Easy to swap for real backend later.
-const KEY = 'domu_user';
+const KEY = 'vyllad_user';
 
 export interface MockUser {
   id: string;
@@ -12,7 +12,7 @@ export interface MockUser {
 const DEMO_USER: MockUser = {
   id: 'u-1',
   name: 'Sofia Ribeiro',
-  email: 'sofia@domu.pt',
+  email: 'sofia@vyllad.pt',
   picture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sofia',
   agencyId: 'agency-1',
 };
