@@ -11,6 +11,7 @@ export interface Property {
   area: number;
   sourceUrl: string;
   agencyId: string;
+  agentIds: string[];
   criteria: PropertyCriteria;
   availableSlots: TimeSlot[];
   createdAt: string;
@@ -39,7 +40,7 @@ export interface Candidate {
   petDetails?: string;
   hasGuarantor: boolean;
   employmentType: 'permanent' | 'contract' | 'freelancer' | 'student' | 'retired' | 'other';
-  employmentDuration: number; // months
+  employmentDuration: number;
   score: number;
   classification: 'excellent' | 'potential' | 'low';
   status: 'new' | 'approved' | 'rejected' | 'visit_scheduled';
@@ -55,6 +56,30 @@ export interface TimeSlot {
   available: boolean;
 }
 
+export interface Agent {
+  id: string;
+  agencyId: string;
+  name: string;
+  email: string;
+  phone: string;
+  picture: string;
+  specialty: string;
+  activeListings: number;
+  conversionRate: number;
+  joinedAt: string;
+}
+
+export interface Appointment {
+  id: string;
+  propertyId: string;
+  candidateId: string;
+  agentId: string;
+  date: string;
+  time: string;
+  status: 'confirmed' | 'completed' | 'cancelled';
+  notes?: string;
+}
+
 export interface Agency {
   id: string;
   name: string;
@@ -64,40 +89,26 @@ export interface Agency {
 
 export function calculateScore(candidate: Omit<Candidate, 'score' | 'classification' | 'id' | 'status' | 'createdAt'>, criteria: PropertyCriteria, price: number): { score: number; classification: Candidate['classification'] } {
   let score = 0;
-
-  // Income ratio (40 points max)
   const incomeRatio = candidate.monthlyIncome / price;
   if (incomeRatio >= 3) score += 40;
   else if (incomeRatio >= 2.5) score += 32;
   else if (incomeRatio >= 2) score += 24;
   else if (incomeRatio >= 1.5) score += 12;
-  else score += 0;
 
-  // People fit (15 points max)
   if (candidate.numberOfPeople <= criteria.maxPeople) score += 15;
   else if (candidate.numberOfPeople === criteria.maxPeople + 1) score += 5;
 
-  // Pets (10 points)
   if (!candidate.hasPets || criteria.petsAllowed) score += 10;
 
-  // Guarantor (15 points)
   if (criteria.guarantorRequired && candidate.hasGuarantor) score += 15;
   else if (!criteria.guarantorRequired) score += 15;
-  else score += 0;
 
-  // Employment stability (20 points)
   const empScores: Record<string, number> = {
-    permanent: 20,
-    retired: 18,
-    contract: 14,
-    freelancer: 10,
-    student: 6,
-    other: 4,
+    permanent: 20, retired: 18, contract: 14, freelancer: 10, student: 6, other: 4,
   };
   score += empScores[candidate.employmentType] || 4;
 
-  // Duration bonus
-  if (candidate.employmentDuration >= 24) score += 0; // already counted
+  if (candidate.employmentDuration >= 24) score += 0;
   else if (candidate.employmentDuration >= 12) score -= 2;
   else score -= 5;
 
