@@ -5,6 +5,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
 import PropertyPage from "./pages/PropertyPage.tsx";
+import PropertyPublic from "./pages/PropertyPublic.tsx";
+import AnnouncementPublic from "./pages/AnnouncementPublic.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import Agents from "./pages/Agents.tsx";
 import Appointments from "./pages/Appointments.tsx";
@@ -24,6 +26,8 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/p/:slug" element={<PropertyPage />} />
+          <Route path="/property/:id" element={<PropertyPublic />} />
+          <Route path="/announcement/:id" element={<AnnouncementPublic />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/dashboard/agentes" element={<ProtectedRoute><Agents /></ProtectedRoute>} />
           <Route path="/dashboard/agendamentos" element={<ProtectedRoute><Appointments /></ProtectedRoute>} />

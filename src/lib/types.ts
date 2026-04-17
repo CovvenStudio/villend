@@ -2,19 +2,27 @@ export interface Property {
   id: string;
   slug: string;
   title: string;
-  price: number;
   description: string;
-  images: string[];
-  location: string;
-  bedrooms: number;
-  bathrooms: number;
-  area: number;
-  sourceUrl: string;
   agencyId: string;
   agentIds: string[];
   criteria: PropertyCriteria;
   availableSlots: TimeSlot[];
   createdAt: string;
+  // Campos do cadastro
+  referenceId?: string;
+  announcementLink?: string;
+  rentalPrice?: number;
+  // Campos legados / opcionais
+  price?: number;
+  images?: string[];
+  location?: string;
+  bedrooms?: number;
+  bathrooms?: number;
+  area?: number;
+  sourceUrl?: string;
+  floor?: number;
+  hasGarage?: boolean;
+  hasElevator?: boolean;
 }
 
 export interface PropertyCriteria {

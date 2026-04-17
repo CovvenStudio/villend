@@ -98,10 +98,14 @@ const Dashboard = () => {
                       : 'border-transparent hover:border-border hover:bg-card/50'
                   }`}
                 >
-                  <img src={p.images[0]} alt="" className="w-11 h-11 rounded-lg object-cover" />
+                  {p.images && p.images.length > 0 ? (
+                    <img src={p.images[0]} alt="" className="w-11 h-11 rounded-lg object-cover" />
+                  ) : (
+                    <div className="w-11 h-11 rounded-lg bg-muted flex items-center justify-center text-lg">🏠</div>
+                  )}
                   <div>
                     <div className="text-sm font-semibold truncate max-w-[180px]">{p.title}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">€{p.price}/mês</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{(p.rentalPrice ?? p.price) ? `€${(p.rentalPrice ?? p.price)}/mês` : p.referenceId ?? ''}</div>
                   </div>
                 </button>
               ))}
@@ -215,9 +219,9 @@ const Dashboard = () => {
               <div className="mt-6 p-5 rounded-xl border bg-card flex items-center justify-between">
                 <div>
                   <div className="text-xs text-muted-foreground mb-1">Link público</div>
-                  <code className="text-sm font-mono text-muted-foreground">/p/{property.slug}</code>
+                  <code className="text-sm font-mono text-muted-foreground">/property/{property.id}</code>
                 </div>
-                <Link to={`/p/${property.slug}`}>
+                <Link to={`/property/${property.id}`} target="_blank">
                   <Button variant="outline" size="sm" className="rounded-lg text-xs">
                     <Eye className="w-3.5 h-3.5 mr-1.5" /> Ver página
                   </Button>

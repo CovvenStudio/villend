@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Upload, CheckCircle2, Check, X } from 'lucide-react';
+import { CheckCircle2, Check } from 'lucide-react';
+import { Ban, PawPrint } from 'lucide-react';
 import { mockAgents } from '@/lib/mock-data';
 
 interface Props {
@@ -16,17 +18,11 @@ type Step = 'info' | 'criteria' | 'done';
 
 const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
   const [step, setStep] = useState<Step>('info');
-  const [images, setImages] = useState<string[]>([]);
   const [propertyInfo, setPropertyInfo] = useState({
     title: '',
-    price: '',
-    location: '',
-    bedrooms: '',
-    bathrooms: '',
-    area: '',
-    floor: '',
-    hasGarage: false,
-    hasElevator: false,
+    referenceId: '',
+    announcementLink: '',
+    rentalPrice: '',
     description: '',
   });
   const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
@@ -34,6 +30,7 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
     minIncome: '',
     maxPeople: '',
     petsAllowed: false,
+    allowedPetTypes: [] as string[],
     advanceMonths: '2',
     depositMonths: '2',
     guarantorRequired: true,
@@ -41,27 +38,8 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
     depositWithoutGuarantor: '3',
   });
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      Array.from(files).forEach((file) => {
-        if (images.length < 3) {
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            setImages((prev) => [...prev, event.target?.result as string]);
-          };
-          reader.readAsDataURL(file);
-        }
-      });
-    }
-  };
-
-  const removeImage = (index: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== index));
-  };
-
   const handleNext = () => {
-    if (propertyInfo.title && propertyInfo.price && propertyInfo.location) {
+    if (propertyInfo.title && propertyInfo.referenceId && propertyInfo.announcementLink) {
       setStep('criteria');
     }
   };
@@ -72,17 +50,11 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
 
   const handleClose = () => {
     setStep('info');
-    setImages([]);
     setPropertyInfo({
       title: '',
-      price: '',
-      location: '',
-      bedrooms: '',
-      bathrooms: '',
-      area: '',
-      floor: '',
-      hasGarage: false,
-      hasElevator: false,
+      referenceId: '',
+      announcementLink: '',
+      rentalPrice: '',
       description: '',
     });
     setSelectedAgents([]);
@@ -95,171 +67,88 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="sticky top-0 bg-background z-10 pb-2 border-b">
+      <DialogContent className="sm:max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="sticky top-0 bg-background z-10 pb-2 border-b pr-10">
           <DialogTitle className="font-display">
-            {step === 'info' && 'Informações do imóvel'}
-            {step === 'criteria' && 'Configurar critérios'}
+            {step === 'info' && 'Novo imóvel'}
+            {step === 'criteria' && 'Critérios de candidatura'}
             {step === 'done' && 'Imóvel criado!'}
           </DialogTitle>
         </DialogHeader>
 
         {step === 'info' && (
           <div className="space-y-4 pt-2 pb-4">
-            {/* Imagens */}
             <div>
-              <Label className="text-sm font-medium mb-2 block">Fotos do imóvel (máx. 3)</Label>
-              <div className="grid grid-cols-3 gap-2 mb-3">
-                {images.map((img, idx) => (
-                  <div key={idx} className="relative group">
-                    <img src={img} alt={`Foto ${idx + 1}`} className="w-full h-24 object-cover rounded-lg" />
-                    <button
-                      type="button"
-                      onClick={() => removeImage(idx)}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-                {images.length < 3 && (
-                  <label className="border-2 border-dashed border-border rounded-lg p-4 flex items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors">
-                    <div className="text-center">
-                      <Upload className="w-4 h-4 mx-auto mb-1 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">Adicionar</span>
-                    </div>
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                    />
-                  </label>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">Recomendamos fotos do exterior, sala de estar e cozinha.</p>
+              <Label className="text-sm font-medium">Título do anúncio *</Label>
+              <Input
+                placeholder="Ex: T2 renovado em Campo de Ourique"
+                value={propertyInfo.title}
+                onChange={(e) => setPropertyInfo(p => ({ ...p, title: e.target.value }))}
+                className="mt-1"
+              />
             </div>
 
-            {/* Campos obrigatórios */}
-            <div className="space-y-3">
-              <div>
-                <Label className="text-sm font-medium">Título do anúncio *</Label>
+            <div>
+              <Label className="text-sm font-medium">ID de referência *</Label>
+              <Input
+                placeholder="Ex: IMV-2024-001"
+                value={propertyInfo.referenceId}
+                onChange={(e) => setPropertyInfo(p => ({ ...p, referenceId: e.target.value }))}
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium">Link do anúncio *</Label>
+              <Input
+                placeholder="https://idealista.pt/..."
+                value={propertyInfo.announcementLink}
+                onChange={(e) => setPropertyInfo(p => ({ ...p, announcementLink: e.target.value }))}
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium">Valor do arrendamento *</Label>
+              <div className="relative mt-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">€</span>
                 <Input
-                  placeholder="Ex: T2 renovado em Campo de Ourique"
-                  value={propertyInfo.title}
-                  onChange={(e) => setPropertyInfo(p => ({ ...p, title: e.target.value }))}
-                  className="mt-1"
+                  type="number"
+                  placeholder="1200"
+                  value={propertyInfo.rentalPrice}
+                  onChange={(e) => setPropertyInfo(p => ({ ...p, rentalPrice: e.target.value }))}
+                  className="pl-7"
                 />
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-sm font-medium">Renda (€) *</Label>
-                  <Input
-                    type="number"
-                    placeholder="1200"
-                    value={propertyInfo.price}
-                    onChange={(e) => setPropertyInfo(p => ({ ...p, price: e.target.value }))}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">Localização *</Label>
-                  <Input
-                    placeholder="Ex: Campo de Ourique, Lisboa"
-                    value={propertyInfo.location}
-                    onChange={(e) => setPropertyInfo(p => ({ ...p, location: e.target.value }))}
-                    className="mt-1"
-                  />
-                </div>
-              </div>
-
-              {/* Características do imóvel */}
-              <div className="grid grid-cols-4 gap-2">
-                <div>
-                  <Label className="text-xs font-medium">Quartos</Label>
-                  <Input
-                    type="number"
-                    placeholder="2"
-                    value={propertyInfo.bedrooms}
-                    onChange={(e) => setPropertyInfo(p => ({ ...p, bedrooms: e.target.value }))}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs font-medium">Casas de banho</Label>
-                  <Input
-                    type="number"
-                    placeholder="1"
-                    value={propertyInfo.bathrooms}
-                    onChange={(e) => setPropertyInfo(p => ({ ...p, bathrooms: e.target.value }))}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs font-medium">Área (m²)</Label>
-                  <Input
-                    type="number"
-                    placeholder="85"
-                    value={propertyInfo.area}
-                    onChange={(e) => setPropertyInfo(p => ({ ...p, area: e.target.value }))}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs font-medium">Andar</Label>
-                  <Input
-                    type="number"
-                    placeholder="3"
-                    value={propertyInfo.floor}
-                    onChange={(e) => setPropertyInfo(p => ({ ...p, floor: e.target.value }))}
-                    className="mt-1"
-                  />
-                </div>
-              </div>
-
-              {/* Booleanos */}
-              <div className="grid grid-cols-2 gap-4 p-3 rounded-lg bg-muted/30 border">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">Garagem incluída</Label>
-                  <Switch
-                    checked={propertyInfo.hasGarage}
-                    onCheckedChange={(v) => setPropertyInfo(p => ({ ...p, hasGarage: v }))}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">Elevador</Label>
-                  <Switch
-                    checked={propertyInfo.hasElevator}
-                    onCheckedChange={(v) => setPropertyInfo(p => ({ ...p, hasElevator: v }))}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-sm font-medium">Descrição (opcional)</Label>
-                <textarea
-                  placeholder="Descreva características especiais do imóvel..."
-                  value={propertyInfo.description}
-                  onChange={(e) => setPropertyInfo(p => ({ ...p, description: e.target.value }))}
-                  rows={3}
-                  className="mt-1 w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 resize-none"
-                />
-              </div>
+              <p className="text-[11px] text-muted-foreground mt-1">Serve de base para cálculo dos adiantamentos e cauções</p>
             </div>
 
-            <Button onClick={handleNext} className="w-full rounded-lg font-semibold">
+            <div>
+              <Label className="text-sm font-medium">Descrição <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+              <textarea
+                placeholder="Descreva características especiais do imóvel..."
+                value={propertyInfo.description}
+                onChange={(e) => setPropertyInfo(p => ({ ...p, description: e.target.value }))}
+                rows={3}
+                className="mt-1 w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring/20 resize-none"
+              />
+            </div>
+
+            <Button
+              onClick={handleNext}
+              disabled={!propertyInfo.title || !propertyInfo.referenceId || !propertyInfo.announcementLink}
+              className="w-full rounded-lg font-semibold"
+            >
               Continuar
             </Button>
           </div>
         )}
 
         {step === 'criteria' && (
-          <div className="space-y-4 pt-2 max-h-[60vh] overflow-y-auto">
+          <div className="space-y-4 pt-2 pb-4">
             <div className="p-3 rounded-lg bg-muted/50 border text-sm">
-              <p className="font-medium">✓ Imóvel: {propertyInfo.title}</p>
-              <p className="text-muted-foreground text-xs mt-1">{propertyInfo.location}</p>
+              <p className="font-medium">{propertyInfo.title}</p>
+              <p className="text-muted-foreground text-xs mt-0.5">Ref: {propertyInfo.referenceId}</p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -281,9 +170,81 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
               </div>
             </div>
 
-            <div className="flex items-center justify-between py-2">
-              <Label className="text-xs font-medium">Animais permitidos</Label>
-              <Switch checked={criteria.petsAllowed} onCheckedChange={(v) => setCriteria(p => ({ ...p, petsAllowed: v }))} />
+            <div>
+              <Label className="text-xs font-medium mb-2 block">Animais de estimação</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: false, label: 'Não permitido', Icon: Ban },
+                  { value: true, label: 'Permitido', Icon: PawPrint },
+                ].map(({ value, label, Icon }) => {
+                  const sel = criteria.petsAllowed === value;
+                  return (
+                    <button
+                      key={String(value)}
+                      type="button"
+                      onClick={() => setCriteria(p => ({ ...p, petsAllowed: value, allowedPetTypes: value ? p.allowedPetTypes : [] }))}
+                      className={`flex items-center gap-2.5 px-3 py-3 rounded-xl border text-sm font-medium transition-all ${
+                        sel
+                          ? 'border-primary bg-primary/5 text-primary'
+                          : 'border-border hover:border-primary/40 hover:bg-muted/50'
+                      }`}
+                    >
+                      <Icon className={`w-4 h-4 flex-shrink-0 ${sel ? 'text-primary' : 'text-muted-foreground'}`} />
+                      <span>{label}</span>
+                      {sel && <CheckCircle2 className="w-3.5 h-3.5 ml-auto text-primary" />}
+                    </button>
+                  );
+                })}
+              </div>
+              <AnimatePresence>
+                {criteria.petsAllowed && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="pt-3">
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Que tipos são permitidos? <span className="text-muted-foreground/60">(opcional)</span>
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { label: 'Cão', icon: '🐕' },
+                          { label: 'Gato', icon: '🐈' },
+                          { label: 'Pássaro', icon: '🦜' },
+                          { label: 'Coelho', icon: '🐇' },
+                          { label: 'Peixe', icon: '🐟' },
+                          { label: 'Réptil', icon: '🦎' },
+                          { label: 'Hamster', icon: '🐹' },
+                        ].map(({ label, icon }) => {
+                          const active = criteria.allowedPetTypes.includes(label);
+                          return (
+                            <button
+                              key={label}
+                              type="button"
+                              onClick={() => setCriteria(p => ({
+                                ...p,
+                                allowedPetTypes: active
+                                  ? p.allowedPetTypes.filter(t => t !== label)
+                                  : [...p.allowedPetTypes, label],
+                              }))}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                                active ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted/50'
+                              }`}
+                            >
+                              <span>{icon}</span>{label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {criteria.allowedPetTypes.length === 0 && (
+                        <p className="text-xs text-muted-foreground/60 mt-2">Nenhum selecionado = todos permitidos</p>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             <div className="flex items-center justify-between py-2">
@@ -293,14 +254,14 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
 
             {criteria.guarantorRequired && (
               <div className="p-3 rounded-lg bg-muted/50 border space-y-3">
-                <p className="text-xs font-medium text-muted-foreground">Valores sem fiador (dinâmico)</p>
+                <p className="text-xs font-medium text-muted-foreground">Valores sem fiador</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label className="text-xs">Adiantamento s/ fiador</Label>
+                    <Label className="text-xs">Adiantamento s/ fiador (meses)</Label>
                     <Input type="number" value={criteria.advanceWithoutGuarantor} onChange={(e) => setCriteria(p => ({ ...p, advanceWithoutGuarantor: e.target.value }))} className="mt-1" />
                   </div>
                   <div>
-                    <Label className="text-xs">Caução s/ fiador</Label>
+                    <Label className="text-xs">Caução s/ fiador (meses)</Label>
                     <Input type="number" value={criteria.depositWithoutGuarantor} onChange={(e) => setCriteria(p => ({ ...p, depositWithoutGuarantor: e.target.value }))} className="mt-1" />
                   </div>
                 </div>
