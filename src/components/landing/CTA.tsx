@@ -24,9 +24,9 @@ const CTA = () => {
             <p className="text-primary-foreground/60 text-base max-w-md mx-auto mb-10 leading-relaxed">
               Os melhores candidatos, automaticamente no seu dashboard. Sem esforço.
             </p>
-            <Link to="/dashboard">
+            <Link to="/login">
               <Button size="lg" variant="secondary" className="h-12 px-7 text-sm font-semibold rounded-xl">
-                Começar gratuitamente
+                Comece já
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </Link>
