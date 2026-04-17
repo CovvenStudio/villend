@@ -3,18 +3,18 @@ import { motion } from 'framer-motion';
 const steps = [
   {
     number: '01',
-    title: 'Cole o link do anúncio',
-    description: 'Basta colar o URL. Extraímos título, preço, fotos e descrição automaticamente.',
+    title: 'Registe o imóvel',
+    description: 'Preencha título, preço, critérios e cole o link do anúncio como referência. Pronto em menos de 2 minutos.',
   },
   {
     number: '02',
     title: 'Configure os critérios',
-    description: 'Defina renda mínima, caução, fiador e regras. O formulário adapta-se.',
+    description: 'Defina renda mínima, caução, fiador e regras. O formulário adapta-se automaticamente.',
   },
   {
     number: '03',
     title: 'Partilhe a página',
-    description: 'Cada imóvel tem uma URL elegante. Partilhe nas redes ou cole no anúncio.',
+    description: 'Cada imóvel tem uma URL elegante. Partilhe nas redes ou substitua o link de contacto no anúncio.',
   },
   {
     number: '04',

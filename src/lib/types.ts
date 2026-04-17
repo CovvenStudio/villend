@@ -55,6 +55,9 @@ export interface Candidate {
   scheduledVisit?: string;
   createdAt: string;
   notes?: string;
+  urgency?: 'immediate' | 'soon' | 'flexible';
+  moveInTimeline?: string;
+  proposedVisit?: string; // ISO datetime proposed by the candidate (awaiting agent confirmation)
 }
 
 export interface TimeSlot {
@@ -128,4 +131,54 @@ export function calculateScore(candidate: Omit<Candidate, 'score' | 'classificat
   else classification = 'low';
 
   return { score, classification };
+}
+
+export interface ScoreBreakdown {
+  financial: number;  // 0-100
+  fit: number;        // 0-100
+  stability: number;  // 0-100
+  urgency: number;    // 0-100
+}
+
+export function getScoreBreakdown(candidate: Candidate, criteria: PropertyCriteria, rentalPrice: number): ScoreBreakdown {
+  const ratio = candidate.monthlyIncome / rentalPrice;
+
+  let financial = 0;
+  if (ratio >= 3) financial = 100;
+  else if (ratio >= 2.5) financial = 80;
+  else if (ratio >= 2) financial = 55;
+  else if (ratio >= 1.5) financial = 30;
+  else financial = 10;
+
+  let fit = 0;
+  if (candidate.numberOfPeople <= criteria.maxPeople) fit += 40;
+  if (!candidate.hasPets || criteria.petsAllowed) fit += 30;
+  if (!criteria.guarantorRequired || candidate.hasGuarantor) fit += 30;
+
+  const empMap: Record<string, number> = {
+    permanent: 100, retired: 90, contract: 70, freelancer: 50, student: 30, other: 20,
+  };
+  const stability = empMap[candidate.employmentType] ?? 20;
+
+  const urgencyMap: Record<string, number> = { immediate: 100, soon: 60, flexible: 20 };
+  const urgency = urgencyMap[candidate.urgency ?? 'flexible'] ?? 20;
+
+  return { financial, fit, stability, urgency };
+}
+
+export function generateInsight(candidate: Candidate, criteria: PropertyCriteria, rentalPrice: number): string {
+  const ratio = candidate.monthlyIncome / rentalPrice;
+  const urgency = candidate.urgency ?? 'flexible';
+
+  if (candidate.hasPets && !criteria.petsAllowed) return 'Animais não permitidos neste imóvel';
+  if (ratio < 1.5) return 'Rendimento abaixo do mínimo recomendado';
+  if (criteria.guarantorRequired && !candidate.hasGuarantor) {
+    return ratio >= 2.5 ? 'Rendimento forte · sem fiador' : 'Sem fiador · rendimento insuficiente';
+  }
+  if (candidate.score >= 80 && urgency === 'immediate') return 'Perfil excelente · pronto para fechar';
+  if (candidate.score >= 80 && urgency === 'soon') return 'Rendimento forte · disponível em breve';
+  if (candidate.score >= 80) return 'Excelente perfil financeiro e laboral';
+  if (candidate.score >= 60 && urgency === 'immediate') return 'Bom perfil · alta urgência de mudança';
+  if (candidate.score >= 60) return 'Perfil razoável · sem urgência imediata';
+  return 'Baixa compatibilidade com os critérios';
 }

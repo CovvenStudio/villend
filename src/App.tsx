@@ -13,6 +13,7 @@ import Appointments from "./pages/Appointments.tsx";
 import Login from "./pages/Login.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import ProtectedRoute from "./components/ProtectedRoute.tsx";
+import VisitBooking from "./pages/VisitBooking.tsx";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +29,7 @@ const App = () => (
           <Route path="/p/:slug" element={<PropertyPage />} />
           <Route path="/property/:id" element={<PropertyPublic />} />
           <Route path="/announcement/:id" element={<AnnouncementPublic />} />
+          <Route path="/visit/:candidateId" element={<VisitBooking />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/dashboard/agentes" element={<ProtectedRoute><Agents /></ProtectedRoute>} />
           <Route path="/dashboard/agendamentos" element={<ProtectedRoute><Appointments /></ProtectedRoute>} />

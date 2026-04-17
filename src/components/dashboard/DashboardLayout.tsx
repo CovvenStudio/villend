@@ -20,10 +20,10 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <div className="min-h-screen bg-background flex">
       <aside className="w-60 border-r bg-card hidden lg:flex flex-col fixed h-screen">
-        <div className="p-5 border-b">
+        <div className="p-5 border-b flex justify-center">
           <Link to="/" className="flex items-center gap-1">
-            <span className="font-display text-lg font-700 tracking-tight">vyllad</span>
-            <span className="text-accent text-lg">.</span>
+            <span className="font-display text-2xl font-700 tracking-tight">vyllad</span>
+            <span className="text-accent text-2xl">.</span>
           </Link>
         </div>
 

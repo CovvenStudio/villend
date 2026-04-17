@@ -1,11 +1,11 @@
 import { motion } from 'framer-motion';
-import { Link2, FileCheck, BarChart3, CalendarCheck, Shield, Zap } from 'lucide-react';
+import { FilePlus2, FileCheck, BarChart3, CalendarCheck, Shield, Zap } from 'lucide-react';
 
 const features = [
   {
-    icon: Link2,
-    title: 'Importar via link',
-    description: 'Cole o URL do Idealista. Extraímos automaticamente título, preço, fotos e descrição.',
+    icon: FilePlus2,
+    title: 'Criação em segundos',
+    description: 'Adicione o imóvel com título, preço e critérios. Cole o link do anúncio como referência — sem extracção, sem aborrecimentos.',
   },
   {
     icon: FileCheck,
@@ -20,7 +20,7 @@ const features = [
   {
     icon: CalendarCheck,
     title: 'Agendamento direto',
-    description: 'Candidatos aprovados escolhem horários. Sem troca de mensagens, sem confusão.',
+    description: 'Candidatos aprovados escolhem horários disponíveis. Sem troca de mensagens, sem confusão.',
   },
   {
     icon: Shield,
@@ -49,7 +49,7 @@ const Features = () => {
             Tudo o que precisa.<br className="hidden md:block" /> Nada que não precisa.
           </h2>
           <p className="text-muted-foreground text-base max-w-md mx-auto leading-relaxed">
-            Uma camada inteligente sobre os seus anúncios existentes.
+            Registe um imóvel, defina as regras, partilhe o link. Os candidatos qualificam-se sozinhos.
           </p>
         </motion.div>
 

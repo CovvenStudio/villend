@@ -102,18 +102,6 @@ const Hero = () => {
                 width={1920}
                 height={1080}
               />
-              {/* Animated radar circle suggesting "scanning property" */}
-              <motion.div
-                className="absolute top-1/2 left-1/2 w-32 h-32 rounded-full border-2 border-accent/60 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-                animate={{ scale: [1, 2.5], opacity: [0.6, 0] }}
-                transition={{ duration: 3, repeat: Infinity, ease: 'easeOut' }}
-              />
-              <motion.div
-                className="absolute top-1/2 left-1/2 w-32 h-32 rounded-full border-2 border-accent/60 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-                animate={{ scale: [1, 2.5], opacity: [0.6, 0] }}
-                transition={{ duration: 3, repeat: Infinity, ease: 'easeOut', delay: 1 }}
-              />
-              <div className="absolute top-1/2 left-1/2 w-3 h-3 bg-accent rounded-full -translate-x-1/2 -translate-y-1/2 shadow-lg shadow-accent/50" />
 
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-primary/60 to-transparent p-5">
                 <p className="text-primary-foreground text-xs font-medium tracking-wide">Villa Cascais · €4.500/mês</p>
