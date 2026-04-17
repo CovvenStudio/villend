@@ -143,7 +143,38 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
               </div>
             )}
 
-            <Button onClick={handleCreate} className="w-full rounded-lg font-semibold">
+            <div className="pt-2">
+              <Label className="text-xs font-medium mb-2 block">Agentes responsáveis</Label>
+              <div className="space-y-2">
+                {mockAgents.map((agent) => {
+                  const checked = selectedAgents.includes(agent.id);
+                  return (
+                    <button
+                      key={agent.id}
+                      type="button"
+                      onClick={() => toggleAgent(agent.id)}
+                      className={`w-full flex items-center gap-3 p-2.5 rounded-lg border text-left transition-all ${
+                        checked ? 'border-accent bg-accent/5' : 'border-border hover:bg-muted/40'
+                      }`}
+                    >
+                      <img src={agent.picture} alt={agent.name} className="w-8 h-8 rounded-full bg-muted shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{agent.name}</div>
+                        <div className="text-xs text-muted-foreground truncate">{agent.specialty}</div>
+                      </div>
+                      <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                        checked ? 'bg-accent border-accent' : 'border-border'
+                      }`}>
+                        {checked && <Check className="w-3 h-3 text-accent-foreground" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">Selecione um ou mais agentes responsáveis por este imóvel.</p>
+            </div>
+
+            <Button onClick={handleCreate} disabled={selectedAgents.length === 0} className="w-full rounded-lg font-semibold">
               Criar imóvel
             </Button>
           </div>
