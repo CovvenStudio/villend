@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Link2, Loader2, CheckCircle2 } from 'lucide-react';
+import { Link2, Loader2, CheckCircle2, Check } from 'lucide-react';
+import { mockAgents } from '@/lib/mock-data';
 
 interface Props {
   open: boolean;
@@ -16,6 +17,7 @@ type Step = 'link' | 'extracting' | 'criteria' | 'done';
 const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
   const [step, setStep] = useState<Step>('link');
   const [url, setUrl] = useState('');
+  const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
   const [criteria, setCriteria] = useState({
     minIncome: '',
     maxPeople: '',
@@ -39,7 +41,12 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
   const handleClose = () => {
     setStep('link');
     setUrl('');
+    setSelectedAgents([]);
     onOpenChange(false);
+  };
+
+  const toggleAgent = (id: string) => {
+    setSelectedAgents((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   };
 
   return (
