@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Link2, Loader2, CheckCircle2, Check } from 'lucide-react';
+import { Upload, CheckCircle2, Check, X } from 'lucide-react';
 import { mockAgents } from '@/lib/mock-data';
 
 interface Props {
@@ -12,11 +12,23 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 }
 
-type Step = 'link' | 'extracting' | 'criteria' | 'done';
+type Step = 'info' | 'criteria' | 'done';
 
 const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
-  const [step, setStep] = useState<Step>('link');
-  const [url, setUrl] = useState('');
+  const [step, setStep] = useState<Step>('info');
+  const [images, setImages] = useState<string[]>([]);
+  const [propertyInfo, setPropertyInfo] = useState({
+    title: '',
+    price: '',
+    location: '',
+    bedrooms: '',
+    bathrooms: '',
+    area: '',
+    floor: '',
+    hasGarage: false,
+    hasElevator: false,
+    description: '',
+  });
   const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
   const [criteria, setCriteria] = useState({
     minIncome: '',
@@ -29,9 +41,29 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
     depositWithoutGuarantor: '3',
   });
 
-  const handleExtract = () => {
-    setStep('extracting');
-    setTimeout(() => setStep('criteria'), 2000);
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      Array.from(files).forEach((file) => {
+        if (images.length < 3) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            setImages((prev) => [...prev, event.target?.result as string]);
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleNext = () => {
+    if (propertyInfo.title && propertyInfo.price && propertyInfo.location) {
+      setStep('criteria');
+    }
   };
 
   const handleCreate = () => {
@@ -39,8 +71,20 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
   };
 
   const handleClose = () => {
-    setStep('link');
-    setUrl('');
+    setStep('info');
+    setImages([]);
+    setPropertyInfo({
+      title: '',
+      price: '',
+      location: '',
+      bedrooms: '',
+      bathrooms: '',
+      area: '',
+      floor: '',
+      hasGarage: false,
+      hasElevator: false,
+      description: '',
+    });
     setSelectedAgents([]);
     onOpenChange(false);
   };
@@ -51,51 +95,171 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="sticky top-0 bg-background z-10 pb-2 border-b">
           <DialogTitle className="font-display">
-            {step === 'link' && 'Adicionar imóvel'}
-            {step === 'extracting' && 'A extrair informações...'}
+            {step === 'info' && 'Informações do imóvel'}
             {step === 'criteria' && 'Configurar critérios'}
             {step === 'done' && 'Imóvel criado!'}
           </DialogTitle>
         </DialogHeader>
 
-        {step === 'link' && (
-          <div className="space-y-4 pt-2">
+        {step === 'info' && (
+          <div className="space-y-4 pt-2 pb-4">
+            {/* Imagens */}
             <div>
-              <Label className="text-sm font-medium">Link do anúncio</Label>
-              <div className="relative mt-1.5">
-                <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Label className="text-sm font-medium mb-2 block">Fotos do imóvel (máx. 3)</Label>
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                {images.map((img, idx) => (
+                  <div key={idx} className="relative group">
+                    <img src={img} alt={`Foto ${idx + 1}`} className="w-full h-24 object-cover rounded-lg" />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(idx)}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+                {images.length < 3 && (
+                  <label className="border-2 border-dashed border-border rounded-lg p-4 flex items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors">
+                    <div className="text-center">
+                      <Upload className="w-4 h-4 mx-auto mb-1 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Adicionar</span>
+                    </div>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">Recomendamos fotos do exterior, sala de estar e cozinha.</p>
+            </div>
+
+            {/* Campos obrigatórios */}
+            <div className="space-y-3">
+              <div>
+                <Label className="text-sm font-medium">Título do anúncio *</Label>
                 <Input
-                  placeholder="https://idealista.pt/imovel/..."
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  className="pl-10"
+                  placeholder="Ex: T2 renovado em Campo de Ourique"
+                  value={propertyInfo.title}
+                  onChange={(e) => setPropertyInfo(p => ({ ...p, title: e.target.value }))}
+                  className="mt-1"
                 />
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Cole o link do Idealista, Imovirtual ou outro portal. Extraímos automaticamente título, preço, fotos e descrição.
-              </p>
-            </div>
-            <Button onClick={handleExtract} disabled={!url} className="w-full rounded-lg font-semibold">
-              Extrair informações
-            </Button>
-          </div>
-        )}
 
-        {step === 'extracting' && (
-          <div className="py-12 text-center">
-            <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto mb-4" />
-            <p className="text-sm text-muted-foreground">A analisar o anúncio...</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-sm font-medium">Renda (€) *</Label>
+                  <Input
+                    type="number"
+                    placeholder="1200"
+                    value={propertyInfo.price}
+                    onChange={(e) => setPropertyInfo(p => ({ ...p, price: e.target.value }))}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Localização *</Label>
+                  <Input
+                    placeholder="Ex: Campo de Ourique, Lisboa"
+                    value={propertyInfo.location}
+                    onChange={(e) => setPropertyInfo(p => ({ ...p, location: e.target.value }))}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+
+              {/* Características do imóvel */}
+              <div className="grid grid-cols-4 gap-2">
+                <div>
+                  <Label className="text-xs font-medium">Quartos</Label>
+                  <Input
+                    type="number"
+                    placeholder="2"
+                    value={propertyInfo.bedrooms}
+                    onChange={(e) => setPropertyInfo(p => ({ ...p, bedrooms: e.target.value }))}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium">Casas de banho</Label>
+                  <Input
+                    type="number"
+                    placeholder="1"
+                    value={propertyInfo.bathrooms}
+                    onChange={(e) => setPropertyInfo(p => ({ ...p, bathrooms: e.target.value }))}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium">Área (m²)</Label>
+                  <Input
+                    type="number"
+                    placeholder="85"
+                    value={propertyInfo.area}
+                    onChange={(e) => setPropertyInfo(p => ({ ...p, area: e.target.value }))}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium">Andar</Label>
+                  <Input
+                    type="number"
+                    placeholder="3"
+                    value={propertyInfo.floor}
+                    onChange={(e) => setPropertyInfo(p => ({ ...p, floor: e.target.value }))}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+
+              {/* Booleanos */}
+              <div className="grid grid-cols-2 gap-4 p-3 rounded-lg bg-muted/30 border">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Garagem incluída</Label>
+                  <Switch
+                    checked={propertyInfo.hasGarage}
+                    onCheckedChange={(v) => setPropertyInfo(p => ({ ...p, hasGarage: v }))}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Elevador</Label>
+                  <Switch
+                    checked={propertyInfo.hasElevator}
+                    onCheckedChange={(v) => setPropertyInfo(p => ({ ...p, hasElevator: v }))}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium">Descrição (opcional)</Label>
+                <textarea
+                  placeholder="Descreva características especiais do imóvel..."
+                  value={propertyInfo.description}
+                  onChange={(e) => setPropertyInfo(p => ({ ...p, description: e.target.value }))}
+                  rows={3}
+                  className="mt-1 w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 resize-none"
+                />
+              </div>
+            </div>
+
+            <Button onClick={handleNext} className="w-full rounded-lg font-semibold">
+              Continuar
+            </Button>
           </div>
         )}
 
         {step === 'criteria' && (
           <div className="space-y-4 pt-2 max-h-[60vh] overflow-y-auto">
             <div className="p-3 rounded-lg bg-muted/50 border text-sm">
-              <p className="font-medium">✓ Informações extraídas com sucesso</p>
-              <p className="text-muted-foreground text-xs mt-1">Título, preço, fotos e descrição importados.</p>
+              <p className="font-medium">✓ Imóvel: {propertyInfo.title}</p>
+              <p className="text-muted-foreground text-xs mt-1">{propertyInfo.location}</p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -174,9 +338,14 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
               <p className="text-xs text-muted-foreground mt-2">Selecione um ou mais agentes responsáveis por este imóvel.</p>
             </div>
 
-            <Button onClick={handleCreate} disabled={selectedAgents.length === 0} className="w-full rounded-lg font-semibold">
-              Criar imóvel
-            </Button>
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <Button onClick={() => setStep('info')} variant="outline" className="rounded-lg font-semibold">
+                Voltar
+              </Button>
+              <Button onClick={handleCreate} disabled={selectedAgents.length === 0} className="rounded-lg font-semibold">
+                Criar imóvel
+              </Button>
+            </div>
           </div>
         )}
 
