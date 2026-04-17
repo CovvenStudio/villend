@@ -33,7 +33,7 @@ const AddAgentDialog = ({ open, onOpenChange, onAdd }: Props) => {
           </div>
           <div>
             <Label className="text-xs font-medium">Email</Label>
-            <Input type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} className="mt-1.5" placeholder="sofia@domu.pt" />
+            <Input type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} className="mt-1.5" placeholder="sofia@vyllad.pt" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

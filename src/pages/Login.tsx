@@ -30,7 +30,7 @@ const Login = () => {
       {/* Left: form */}
       <div className="flex flex-col items-center justify-center px-8 py-12 relative">
         <Link to="/" className="absolute top-8 left-8 flex items-center gap-1">
-          <span className="font-display text-xl font-700 tracking-tight">domu</span>
+          <span className="font-display text-xl font-700 tracking-tight">vyllad</span>
           <span className="text-accent text-xl">.</span>
         </Link>
 
@@ -80,9 +80,9 @@ const Login = () => {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-primary/80 via-primary/20 to-transparent" />
         <div className="absolute bottom-12 left-12 right-12 text-primary-foreground">
-          <p className="text-xs tracking-[0.2em] uppercase text-accent mb-3">Domu</p>
+          <p className="text-xs tracking-[0.2em] uppercase text-accent mb-3">Vyllad</p>
           <p className="font-display text-2xl font-600 leading-tight max-w-md">
-            "A Domu transformou a forma como gerimos candidatos. Triagem 5× mais rápida."
+            "A Vyllad transformou a forma como gerimos candidatos. Triagem 5× mais rápida."
           </p>
           <p className="text-sm text-primary-foreground/60 mt-4">— Inês Carvalho, Real Estate</p>
         </div>
