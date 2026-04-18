@@ -127,7 +127,7 @@ function SmartInsightsPanel({
           <p className="text-sm text-center text-muted-foreground py-6">Nenhum lead nesta categoria.</p>
         ) : (
           <div className="space-y-1">
-            <AnimatePresence mode="wait">
+            <AnimatePresence>
               {displayed.map((c, i) => {
                 const prop = properties.find(p => p.id === c.propertyId);
                 const insight = prop

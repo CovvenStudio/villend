@@ -22,7 +22,7 @@ const Login = () => {
   const handleGoogleLogin = async () => {
     setLoading(true);
     await auth.signInWithGoogle();
-    navigate('/dashboard');
+    navigate('/onboarding');
   };
 
   return (
@@ -61,10 +61,6 @@ const Login = () => {
             )}
           </Button>
 
-          <p className="text-xs text-muted-foreground mt-8 text-center leading-relaxed">
-            Apenas imobiliárias precisam de conta.<br />
-            Candidatos recebem magic link por email.
-          </p>
         </motion.div>
       </div>
 

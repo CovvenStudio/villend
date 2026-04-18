@@ -10,7 +10,13 @@ const Navbar = () => {
           <span className="text-accent text-xl">.</span>
         </Link>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-5">
+          <a
+            href="#pricing"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:block"
+          >
+            Preços
+          </a>
           <Link to="/login">
             <Button size="sm" className="font-medium rounded-lg text-sm px-5">
               Comece já
