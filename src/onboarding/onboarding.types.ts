@@ -11,6 +11,10 @@ export interface AgencySetup {
   county: string;
   /** Distrito (e.g. "Lisboa") */
   district: string;
+  /** Nome do país */
+  country?: string;
+  /** Sigla do país (ex: PT, BR) */
+  countryCode?: string;
 }
 
 export interface OnboardingState {
@@ -24,7 +28,17 @@ export interface OnboardingState {
 export interface OnboardingSubmission {
   agencyId: string;
   planId: PlanId;
+  /** MongoDB ObjectId of the selected plan — used for the real API call */
+  backendPlanId?: string;
   agency: AgencySetup;
+  /** Market code from BillingCountry (e.g. "EUROPE", "BR") */
+  billingMarket?: string;
+  /** Currency from BillingCountry (e.g. "EUR", "BRL") */
+  billingCurrency?: string;
+  /** Nome do país */
+  country?: string;
+  /** Sigla do país (ex: PT, BR) */
+  countryCode?: string;
 }
 
 // ─── Raw API Shapes ───────────────────────────────────────────────────────────

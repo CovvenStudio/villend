@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { Building2, Calendar, UserCog, LogOut, Menu } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { auth } from '@/lib/auth';
+import { useAuth } from '@/contexts/AuthContext';
 
 const navItems = [
   { to: '/dashboard', icon: Building2, label: 'Imóveis', end: true },
@@ -12,10 +12,10 @@ const navItems = [
 
 function NavContent({ onNav }: { onNav?: () => void }) {
   const navigate = useNavigate();
-  const user = auth.getUser();
+  const { user, signOut } = useAuth();
 
   const handleSignOut = () => {
-    auth.signOut();
+    signOut();
     navigate('/login');
   };
 
@@ -52,7 +52,13 @@ function NavContent({ onNav }: { onNav?: () => void }) {
       <div className="p-4 border-t space-y-3">
         {user && (
           <div className="flex items-center gap-3 px-1">
-            <img src={user.picture} alt={user.name} className="w-8 h-8 rounded-full bg-muted" />
+            {user.avatarUrl ? (
+              <img src={user.avatarUrl} alt={user.name} className="w-9 h-9 rounded-full object-cover ring-2 ring-[#1a2341] ring-offset-1" />
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-[#1a2341]/10 flex items-center justify-center text-sm font-semibold text-[#1a2341] ring-2 ring-[#1a2341] ring-offset-1">
+                {user.name.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div className="min-w-0 flex-1">
               <div className="text-xs font-semibold truncate">{user.name}</div>
               <div className="text-[11px] text-muted-foreground truncate">{user.email}</div>

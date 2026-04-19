@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from 'react';
 import type { Plan } from './plans.types';
-import { plansRepository } from './plans.mock-repository';
+import { plansApiRepository } from './plans.api-repository';
 
 export function usePlans() {
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -12,7 +12,7 @@ export function usePlans() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    plansRepository
+    plansApiRepository
       .fetchAll()
       .then(setPlans)
       .catch(() => setError('Não foi possível carregar os planos.'))

@@ -20,7 +20,7 @@ class OnboardingMockRepository implements IOnboardingRepository {
     };
   }
 
-  async complete(submission: OnboardingSubmission): Promise<void> {
+  async complete(submission: OnboardingSubmission): Promise<{ redirectedToStripe: boolean }> {
     await new Promise((r) => setTimeout(r, 500));
     const state: OnboardingState = {
       step: 'confirm',
@@ -29,6 +29,7 @@ class OnboardingMockRepository implements IOnboardingRepository {
       completed: true,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return { redirectedToStripe: false };
   }
 }
 

@@ -16,16 +16,26 @@ export interface PlanLimits {
   trialDays: number | null;
 }
 
+export interface MarketPrice {
+  market: string;
+  currency: string;
+  price: number;
+}
+
 export interface Plan {
   id: PlanId;
+  /** The MongoDB ObjectId from the backend — used when submitting to /api/onboarding/complete */
+  backendPlanId: string;
   name: string;
   tagline: string;
-  /** Monthly price in euros. null = contact sales */
+  /** Base monthly price in euros. null = contact sales */
   price: number | null;
   billing: BillingType;
   limits: PlanLimits;
   /** Marketing feature list for the pricing card */
   features: string[];
+  /** Per-market pricing from the backend */
+  marketPrices: MarketPrice[] | null;
   /** Whether this plan is visually highlighted (e.g. "Mais popular") */
   highlighted: boolean;
   /** Optional badge text shown on the card */

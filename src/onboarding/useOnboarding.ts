@@ -4,28 +4,49 @@
 
 import { useCallback, useState } from 'react';
 import type { AgencySetup, OnboardingStep } from './onboarding.types';
-import type { PlanId } from '@/plans';
-import { onboardingRepository } from './onboarding.mock-repository';
+import type { Plan, PlanId } from '@/plans';
+import type { BillingCountry } from '@/billing-countries/useBillingCountries';
+import { onboardingApiRepository } from './onboarding.api-repository';
+
 
 export function useOnboarding() {
   const [step, setStep] = useState<OnboardingStep>('plan');
   const [selectedPlanId, setSelectedPlanId] = useState<PlanId | null>(null);
+  const [selectedBackendPlanId, setSelectedBackendPlanId] = useState<string | null>(null);
+  const [billingCountry, setBillingCountry] = useState<BillingCountry | null>(null);
   const [agency, setAgencyState] = useState<AgencySetup>({
     name: '',
     county: '',
     district: '',
+    country: '',
+    countryCode: '',
   });
   const [submitting, setSubmitting] = useState(false);
 
-  const selectPlan = useCallback((id: PlanId) => {
-    setSelectedPlanId(id);
+  const selectBillingCountry = useCallback((country: BillingCountry) => {
+    setBillingCountry(country);
+    setAgencyState((prev) => ({
+      ...prev,
+      country: country.name,
+      countryCode: country.countryCode,
+    }));
+  }, []);
+
+  const selectPlan = useCallback((plan: Plan) => {
+    setSelectedPlanId(plan.id);
+    setSelectedBackendPlanId(plan.backendPlanId);
     setStep('agency');
   }, []);
 
   const submitAgency = useCallback((data: AgencySetup) => {
-    setAgencyState(data);
+    setAgencyState((prev) => ({
+      ...prev,
+      ...data,
+      country: billingCountry?.name ?? prev.country,
+      countryCode: billingCountry?.countryCode ?? prev.countryCode,
+    }));
     setStep('confirm');
-  }, []);
+  }, [billingCountry]);
 
   const goBack = useCallback(() => {
     setStep((prev) => {
@@ -35,25 +56,31 @@ export function useOnboarding() {
     });
   }, []);
 
-  const confirm = useCallback(async (): Promise<void> => {
-    if (!selectedPlanId) return;
+  const confirm = useCallback(async (): Promise<boolean> => {
+    if (!selectedPlanId || !selectedBackendPlanId) return false;
     setSubmitting(true);
-    try {
-      await onboardingRepository.complete({
-        agencyId: 'agency-1', // replaced by real auth context in production
-        planId: selectedPlanId,
-        agency,
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  }, [selectedPlanId, agency]);
+    const { redirectedToStripe } = await onboardingApiRepository.complete({
+      agencyId: '',
+      planId: selectedPlanId,
+      backendPlanId: selectedBackendPlanId,
+      agency,
+      billingMarket: billingCountry?.market,
+      billingCurrency: billingCountry?.currency,
+      country: billingCountry?.name,
+      countryCode: billingCountry?.countryCode,
+    });
+    // Só tira o loading se NÃO for Stripe (ou seja, trial)
+    if (!redirectedToStripe) setSubmitting(false);
+    return redirectedToStripe;
+  }, [selectedPlanId, selectedBackendPlanId, agency, billingCountry]);
 
   return {
     step,
     selectedPlanId,
     agency,
+    billingCountry,
     submitting,
+    selectBillingCountry,
     selectPlan,
     submitAgency,
     goBack,

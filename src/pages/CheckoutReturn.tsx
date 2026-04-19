@@ -1,0 +1,65 @@
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { apiFetch } from '@/lib/api-client';
+
+type SyncStatus = 'syncing' | 'success' | 'error';
+
+export default function CheckoutReturn() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('syncing');
+
+  useEffect(() => {
+    const sessionId = searchParams.get('session_id');
+
+    apiFetch<{ status: string }>('/subscriptions/sync', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId: sessionId ?? undefined }),
+    })
+      .then(() => {
+        setSyncStatus('success');
+        // Short delay so the user sees the success feedback
+        setTimeout(() => navigate('/dashboard', { replace: true }), 1500);
+      })
+      .catch(() => {
+        setSyncStatus('error');
+        // Navigate to dashboard anyway — subscription may already be active
+        setTimeout(() => navigate('/dashboard', { replace: true }), 3000);
+      });
+  }, [navigate, searchParams]);
+
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="text-center space-y-4 max-w-xs px-4">
+        {syncStatus === 'syncing' && (
+          <>
+            <Loader2 className="w-10 h-10 animate-spin text-muted-foreground mx-auto" />
+            <div>
+              <p className="font-display text-base font-600 tracking-tight">A ativar subscrição…</p>
+              <p className="text-sm text-muted-foreground mt-1">Só um momento.</p>
+            </div>
+          </>
+        )}
+        {syncStatus === 'success' && (
+          <>
+            <CheckCircle className="w-10 h-10 text-emerald-500 mx-auto" />
+            <div>
+              <p className="font-display text-base font-600 tracking-tight">Subscrição ativada!</p>
+              <p className="text-sm text-muted-foreground mt-1">A redirecionar para o painel…</p>
+            </div>
+          </>
+        )}
+        {syncStatus === 'error' && (
+          <>
+            <AlertCircle className="w-10 h-10 text-amber-500 mx-auto" />
+            <div>
+              <p className="font-display text-base font-600 tracking-tight">Quase lá…</p>
+              <p className="text-sm text-muted-foreground mt-1">O pagamento foi processado. A redirecionar…</p>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

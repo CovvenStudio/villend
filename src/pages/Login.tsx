@@ -3,7 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { auth } from '@/lib/auth';
+import { useGoogleLogin } from '@react-oauth/google';
+import { useAuth } from '@/contexts/AuthContext';
 import heroVilla from '@/assets/hero-villa.jpg';
 
 const GoogleIcon = () => (
@@ -17,12 +18,37 @@ const GoogleIcon = () => (
 
 const Login = () => {
   const navigate = useNavigate();
+  const { signIn } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleSuccess = async (tokenResponse: { access_token: string }) => {
     setLoading(true);
-    await auth.signInWithGoogle();
-    navigate('/onboarding');
+    setError(null);
+    try {
+      const { needsOnboarding, multipleAgencies } = await signIn(tokenResponse.access_token);
+      if (needsOnboarding) {
+        navigate('/onboarding', { replace: true });
+      } else if (multipleAgencies) {
+        navigate('/select-agency', { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao autenticar com o Google.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const googleLogin = useGoogleLogin({
+    onSuccess: handleGoogleSuccess,
+    onError: () => setError('O login com Google foi cancelado ou falhou.'),
+  });
+
+  const handleGoogleClick = () => {
+    setError(null);
+    googleLogin();
   };
 
   return (
@@ -46,7 +72,7 @@ const Login = () => {
           </p>
 
           <Button
-            onClick={handleGoogleLogin}
+            onClick={handleGoogleClick}
             disabled={loading}
             variant="outline"
             className="w-full h-12 rounded-xl font-medium text-sm gap-3 border-2"
@@ -60,6 +86,10 @@ const Login = () => {
               </>
             )}
           </Button>
+
+          {error && (
+            <p className="mt-4 text-sm text-destructive text-center">{error}</p>
+          )}
 
         </motion.div>
       </div>

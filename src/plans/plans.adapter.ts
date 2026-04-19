@@ -7,6 +7,7 @@ import type { Plan, PlanId, RawPlan } from './plans.types';
 export function adaptPlan(raw: RawPlan): Plan {
   return {
     id: raw.id as PlanId,
+    backendPlanId: raw.id,
     name: raw.name,
     tagline: raw.tagline,
     price: raw.price_cents !== null ? raw.price_cents / 100 : null,
@@ -18,6 +19,7 @@ export function adaptPlan(raw: RawPlan): Plan {
       trialDays: raw.limits.trial_days,
     },
     features: raw.features,
+    marketPrices: null,
     highlighted: raw.highlighted,
     badge: raw.badge,
     cta: raw.cta,

@@ -1,15 +1,21 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, ChevronLeft, ChevronDown, Loader2, Building2, MapPin, Users, FileText, Zap, BarChart3, Link2, Calendar, Star } from 'lucide-react';
+import { Check, ChevronLeft, ChevronDown, Loader2, Building2, MapPin, Users, FileText, Zap, BarChart3, Link2, Calendar, Star, Clock, SendHorizonal, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { usePlans } from '@/plans';
 import { useOnboarding, isOnboardingComplete } from '@/onboarding';
+import { useBillingCountries } from '@/billing-countries/useBillingCountries';
+import { BillingCountrySelect } from '@/billing-countries/BillingCountrySelect';
+import type { BillingCountry } from '@/billing-countries/useBillingCountries';
 import type { AgencySetup } from '@/onboarding';
 import type { Plan, PlanId } from '@/plans';
+import { useAuth } from '@/contexts/AuthContext';
+import { requestTrial } from '@/lib/auth-api';
 
 // ─── Portugal Districts ───────────────────────────────────────────────────────
 const PORTUGAL_DISTRICTS = [
@@ -17,6 +23,16 @@ const PORTUGAL_DISTRICTS = [
   'Évora', 'Faro', 'Guarda', 'Leiria', 'Lisboa', 'Portalegre', 'Porto',
   'Santarém', 'Setúbal', 'Viana do Castelo', 'Vila Real', 'Viseu',
   'Região Autónoma dos Açores', 'Região Autónoma da Madeira',
+];
+
+// ─── Brazilian States ─────────────────────────────────────────────────────────
+const BRAZIL_STATES = [
+  'Acre', 'Alagoas', 'Amapá', 'Amazonas', 'Bahia', 'Ceará',
+  'Distrito Federal', 'Espírito Santo', 'Goiás', 'Maranhão',
+  'Mato Grosso', 'Mato Grosso do Sul', 'Minas Gerais', 'Pará',
+  'Paraíba', 'Paraná', 'Pernambuco', 'Piauí', 'Rio de Janeiro',
+  'Rio Grande do Norte', 'Rio Grande do Sul', 'Rondônia', 'Roraima',
+  'Santa Catarina', 'São Paulo', 'Sergipe', 'Tocantins',
 ];
 
 // ─── Step Indicator ───────────────────────────────────────────────────────────
@@ -61,6 +77,7 @@ function StepIndicator({ current }: { current: string }) {
 }
 
 // ─── Plan Card ────────────────────────────────────────────────────────────────
+
 const FEATURE_ICONS: Record<string, React.ReactNode> = {
   'Score': <Star className="w-3 h-3" />,
   'AI': <Zap className="w-3 h-3" />,
@@ -76,29 +93,58 @@ function getFeatureIcon(feature: string) {
   return <Check className="w-3 h-3" />;
 }
 
+// Move useSearchParams and useEffect to the main component (likely Onboarding)
+
 function PlanCard({
   plan,
   selected,
   onSelect,
+  billingCountry,
+  trialRequestedAt,
+  trialAllowedAt,
+  onRequestTrial,
 }: {
   plan: Plan;
   selected: boolean;
-  onSelect: (id: PlanId) => void;
+  onSelect: (plan: Plan) => void;
+  billingCountry: BillingCountry | null;
+  trialRequestedAt?: string | null;
+  trialAllowedAt?: string | null;
+  onRequestTrial?: () => void;
 }) {
   const isTrial = plan.id === 'trial';
   const isScale = plan.id === 'scale';
+
+  // Trial gate states
+  const trialApproved = isTrial && !!trialAllowedAt;
+  const trialPending  = isTrial && !!trialRequestedAt && !trialAllowedAt;
+  const trialLocked   = isTrial && !trialRequestedAt && !trialAllowedAt;
+  const isDisabled    = trialPending;
+
+  // Resolve display price from marketPrices or fallback to base price
+  const marketEntry = billingCountry && plan.marketPrices
+    ? plan.marketPrices.find((mp) => mp.market === billingCountry.market) ?? null
+    : null;
+  const displayPrice = marketEntry !== null ? marketEntry.price : plan.price;
+  const currency = billingCountry?.currency ?? 'EUR';
+  const currencySymbol = currency === 'BRL' ? 'R$' : '€';
 
   return (
     <motion.button
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -2 }}
+      whileHover={isDisabled || trialLocked ? {} : { y: -2 }}
       transition={{ duration: 0.25 }}
-      onClick={() => onSelect(plan.id)}
+      onClick={() => !isDisabled && !trialLocked && onSelect(plan)}
+      disabled={isDisabled}
       className={cn(
         'relative w-full h-full text-left rounded-2xl border p-6 flex flex-col gap-4 transition-all duration-200',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        selected
+        isDisabled
+          ? 'border-border bg-card/50 opacity-70 cursor-not-allowed'
+          : trialLocked
+          ? 'border-dashed border-accent/40 bg-card/50 cursor-default'
+          : selected
           ? 'border-foreground bg-card shadow-lg'
           : plan.highlighted
           ? 'border-foreground/30 bg-card hover:border-foreground/60'
@@ -137,7 +183,7 @@ function PlanCard({
           </>
         ) : (
           <>
-            <span className="font-display text-3xl font-700 tracking-tight">€{plan.price}</span>
+            <span className="font-display text-3xl font-700 tracking-tight">{currencySymbol}{displayPrice}</span>
             <span className="text-xs text-muted-foreground">/mês</span>
           </>
         )}
@@ -145,18 +191,18 @@ function PlanCard({
 
       {/* Limits summary */}
       {!isScale && (
-        <div className="grid grid-cols-3 gap-2 py-3 border-y border-border/60">
-          <div className="text-center">
-            <p className="font-display text-lg font-700">{plan.limits.properties ?? '∞'}</p>
-            <p className="text-[10px] text-muted-foreground leading-tight">imóveis</p>
+        <div className="grid grid-cols-3 gap-1 py-3 border-y border-border/60">
+          <div className="flex flex-col items-center justify-between gap-1 px-1">
+            <p className="font-display text-lg font-700 leading-none">{plan.limits.properties ?? '∞'}</p>
+            <p className="text-[10px] text-muted-foreground text-center leading-tight">imóveis</p>
           </div>
-          <div className="text-center border-x border-border/60">
-            <p className="font-display text-lg font-700">{plan.limits.candidatesPerProperty ?? '∞'}</p>
-            <p className="text-[10px] text-muted-foreground leading-tight">candidatos/mês</p>
+          <div className="flex flex-col items-center justify-between gap-1 px-1 border-x border-border/60">
+            <p className="font-display text-lg font-700 leading-none">{plan.limits.candidatesPerProperty ?? '∞'}</p>
+            <p className="text-[10px] text-muted-foreground text-center leading-tight">cand./mês</p>
           </div>
-          <div className="text-center">
-            <p className="font-display text-lg font-700">{plan.limits.agents ?? '∞'}</p>
-            <p className="text-[10px] text-muted-foreground leading-tight">agentes</p>
+          <div className="flex flex-col items-center justify-between gap-1 px-1">
+            <p className="font-display text-lg font-700 leading-none">{plan.limits.agents ?? '∞'}</p>
+            <p className="text-[10px] text-muted-foreground text-center leading-tight">agentes</p>
           </div>
         </div>
       )}
@@ -172,36 +218,171 @@ function PlanCard({
       </ul>
 
       {/* Selection indicator */}
-      <div className={cn(
-        'h-8 rounded-lg flex items-center justify-center text-xs font-medium transition-all duration-200',
-        selected
-          ? 'bg-foreground text-background'
-          : 'bg-muted/60 text-muted-foreground',
-      )}>
-        {selected ? (
-          <span className="flex items-center gap-1.5"><Check className="w-3 h-3" /> Selecionado</span>
-        ) : (
-          plan.cta
-        )}
-      </div>
+      {trialPending ? (
+        <div className="h-8 rounded-lg flex items-center justify-center gap-1.5 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+          <Clock className="w-3 h-3" />
+          Aguarda aprovação
+        </div>
+      ) : trialLocked ? (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onRequestTrial?.(); }}
+          className="h-8 rounded-lg flex items-center justify-center gap-1.5 text-xs font-medium w-full bg-accent/10 text-accent border border-accent/30 hover:bg-accent/20 transition-colors cursor-pointer"
+        >
+          <SendHorizonal className="w-3 h-3" />
+          Solicitar Trial
+        </button>
+      ) : (
+        <div className={cn(
+          'h-8 rounded-lg flex items-center justify-center text-xs font-medium transition-all duration-200',
+          selected
+            ? 'bg-foreground text-background'
+            : 'bg-muted/60 text-muted-foreground',
+        )}>
+          {selected ? (
+            <span className="flex items-center gap-1.5"><Check className="w-3 h-3" /> Selecionado</span>
+          ) : (
+            plan.cta
+          )}
+        </div>
+      )}
     </motion.button>
   );
 }
 
 // ─── Step 1 — Plan Selection ──────────────────────────────────────────────────
-function StepPlan({ onSelect }: { onSelect: (id: PlanId) => void }) {
+function StepPlan({
+  billingCountry,
+  onBillingCountryChange,
+  onSelect,
+}: {
+  billingCountry: BillingCountry | null;
+  onBillingCountryChange: (c: BillingCountry) => void;
+  onSelect: (plan: Plan) => void;
+}) {
   const { plans, loading } = usePlans();
+  const { countries, loading: countriesLoading } = useBillingCountries();
+  const { user } = useAuth();
   const [hovered, setHovered] = useState<PlanId | null>(null);
+  const [trialRequesting, setTrialRequesting] = useState(false);
+  const [trialRequested, setTrialRequested] = useState(false);
+  const [showTrialSuccess, setShowTrialSuccess] = useState(false);
+
+  // Compute live trial state (local optimistic update if just requested)
+  const trialRequestedAt = trialRequested ? new Date().toISOString() : (user?.trialRequestedAt ?? null);
+  const trialAllowedAt   = user?.trialAllowedAt ?? null;
+
+  // Default to Portugal, fall back to first country
+  useEffect(() => {
+    if (!billingCountry && countries.length > 0) {
+      const pt = countries.find((c) => c.countryCode === 'PT') ?? countries[0];
+      onBillingCountryChange(pt);
+    }
+  }, [countries, billingCountry, onBillingCountryChange]);
+
+  const handleRequestTrial = useCallback(async () => {
+    if (trialRequesting) return;
+    setTrialRequesting(true);
+    try {
+      await requestTrial();
+      setTrialRequested(true);
+      setShowTrialSuccess(true);
+    } catch (err) {
+      console.error('[requestTrial]', err);
+    } finally {
+      setTrialRequesting(false);
+    }
+  }, [trialRequesting]);
 
   return (
     <div>
+      {/* ─── Trial Success Overlay ─────────────────────────────────────── */}
+      <AnimatePresence>
+        {showTrialSuccess && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background px-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.5 }}
+              className="w-full max-w-md text-center space-y-6"
+            >
+              {/* Logo */}
+              <div className="flex items-center justify-center gap-1 mb-2">
+                <span className="font-display text-xl tracking-tight text-foreground">vyllad</span>
+                <span className="text-accent text-xl">.</span>
+              </div>
+
+              {/* Success icon */}
+              <div className="flex justify-center">
+                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/15">
+                  <Check className="h-10 w-10 text-emerald-600" />
+                </div>
+              </div>
+
+              {/* Headline */}
+              <div className="space-y-3">
+                <h1 className="font-display text-2xl tracking-tight text-foreground">
+                  Pedido enviado com sucesso!
+                </h1>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  O teu acesso trial está quase aqui — só precisamos de validar o teu pedido.
+                </p>
+              </div>
+
+              {/* Details card */}
+              <div className="rounded-xl border border-border bg-card p-5 text-left space-y-3">
+                <p className="text-sm text-foreground leading-relaxed">
+                  A nossa equipa vai analisar o teu pedido e entrar em contacto em breve.
+                </p>
+                <p className="text-sm text-foreground leading-relaxed">
+                  Durante o trial terás acesso completo à plataforma — imóveis, triagem automática e relatórios.
+                </p>
+                <p className="text-sm font-medium text-accent">
+                  Normalmente aprovamos em menos de 24 horas. ⚡
+                </p>
+              </div>
+
+              {/* Email notice */}
+              <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                <Mail className="h-3.5 w-3.5" />
+                Vais receber um email quando o acesso for ativado.
+              </div>
+
+              {/* Back button */}
+              <button
+                onClick={() => setShowTrialSuccess(false)}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-transparent py-3 text-sm font-medium text-muted-foreground transition-all hover:bg-muted"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Voltar aos planos
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <h1 className="font-display text-3xl font-700 tracking-tight mb-2">
         Escolha o seu plano
       </h1>
-      <p className="text-muted-foreground text-sm mb-8 leading-relaxed">
+      <p className="text-muted-foreground text-sm mb-6 leading-relaxed">
         Todos os planos incluem triagem automática de candidatos.<br />
         Pode alterar ou cancelar a qualquer momento.
       </p>
+
+      {/* Billing country selector */}
+      <div className="flex items-center gap-3 mb-8">
+        <span className="text-sm text-muted-foreground">País de faturação:</span>
+        <BillingCountrySelect
+          countries={countries}
+          value={billingCountry}
+          onChange={onBillingCountryChange}
+          loading={countriesLoading}
+        />
+      </div>
 
       {loading ? (
         <div className="flex items-center gap-3 text-muted-foreground">
@@ -221,6 +402,10 @@ function StepPlan({ onSelect }: { onSelect: (id: PlanId) => void }) {
                 plan={plan}
                 selected={hovered === plan.id}
                 onSelect={onSelect}
+                billingCountry={billingCountry}
+                trialRequestedAt={plan.id === 'trial' ? trialRequestedAt : undefined}
+                trialAllowedAt={plan.id === 'trial' ? trialAllowedAt : undefined}
+                onRequestTrial={plan.id === 'trial' ? handleRequestTrial : undefined}
               />
             </div>
           ))}
@@ -233,14 +418,32 @@ function StepPlan({ onSelect }: { onSelect: (id: PlanId) => void }) {
 // ─── Step 2 — Agency Setup ────────────────────────────────────────────────────
 function StepAgency({
   initial,
+  billingCountry,
   onSubmit,
   onBack,
 }: {
   initial: AgencySetup;
+  billingCountry: BillingCountry | null;
   onSubmit: (data: AgencySetup) => void;
   onBack: () => void;
 }) {
+  const isBR = billingCountry?.countryCode === 'BR';
+  const isPT = !billingCountry || billingCountry.countryCode === 'PT';
+
+  const regionLabel  = isPT ? 'Distrito'   : isBR ? 'Estado'  : 'Região';
+  const cityLabel    = isPT ? 'Concelho'   : isBR ? 'Cidade'  : 'Cidade';
+  const regionPlaceholder = isPT ? 'Selecione o distrito' : isBR ? 'Selecione o estado' : 'Região';
+  const cityPlaceholder   = isPT ? 'Ex: Lisboa'           : isBR ? 'Ex: São Paulo'       : 'Cidade';
+  const useSelectForRegion = isPT || isBR;
+  const regionOptions = isPT ? PORTUGAL_DISTRICTS : isBR ? BRAZIL_STATES : [];
+
   const [form, setForm] = useState<AgencySetup>(initial);
+
+  // Reset region when country changes so stale value doesn't carry over
+  useEffect(() => {
+    setForm((p) => ({ ...p, district: '' }));
+  }, [billingCountry?.countryCode]);
+
   const valid = form.name.trim().length > 0 && form.county.trim().length > 0 && form.district.length > 0;
 
   const handleSubmit = useCallback(
@@ -265,9 +468,18 @@ function StepAgency({
       <h1 className="font-display text-3xl font-700 tracking-tight mb-2">
         Configure a sua imobiliária
       </h1>
-      <p className="text-muted-foreground text-sm mb-8 leading-relaxed">
+      <p className="text-muted-foreground text-sm mb-6 leading-relaxed">
         Isto ajuda a personalizar os critérios de qualificação para a sua região.
       </p>
+
+      {/* Selected country badge */}
+      {billingCountry && (
+        <div className="flex items-center gap-2 mb-6 px-3 py-2 rounded-xl bg-muted/60 w-fit text-sm text-muted-foreground">
+          {billingCountry.flagEmoji && <span className="text-base leading-none">{billingCountry.flagEmoji}</span>}
+          <span>{billingCountry.name}</span>
+          <span className="text-xs opacity-60">{billingCountry.currency}</span>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-1.5">
@@ -285,40 +497,52 @@ function StepAgency({
           />
         </div>
 
+        {/* Region field — select for PT/BR, free text for others */}
         <div className="space-y-1.5">
           <Label htmlFor="agency-district" className="text-sm font-medium flex items-center gap-1.5">
             <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
-            Distrito
+            {regionLabel}
           </Label>
-          <div className="relative">
-            <select
+          {useSelectForRegion ? (
+            <div className="relative">
+              <select
+                id="agency-district"
+                value={form.district}
+                onChange={(e) => setForm((p) => ({ ...p, district: e.target.value }))}
+                className={cn(
+                  'w-full h-11 rounded-xl border border-input bg-background px-3 pr-10 text-sm appearance-none',
+                  'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0',
+                  'transition-colors',
+                  !form.district && 'text-muted-foreground',
+                )}
+              >
+                <option value="" disabled>{regionPlaceholder}</option>
+                {regionOptions.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            </div>
+          ) : (
+            <Input
               id="agency-district"
+              placeholder={regionPlaceholder}
               value={form.district}
               onChange={(e) => setForm((p) => ({ ...p, district: e.target.value }))}
-              className={cn(
-                'w-full h-11 rounded-xl border border-input bg-background px-3 pr-10 text-sm appearance-none',
-                'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0',
-                'transition-colors',
-                !form.district && 'text-muted-foreground',
-              )}
-            >
-              <option value="" disabled>Selecione o distrito</option>
-              {PORTUGAL_DISTRICTS.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          </div>
+              className="h-11 rounded-xl"
+            />
+          )}
         </div>
 
+        {/* City field */}
         <div className="space-y-1.5">
           <Label htmlFor="agency-county" className="text-sm font-medium flex items-center gap-1.5">
             <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
-            Concelho
+            {cityLabel}
           </Label>
           <Input
             id="agency-county"
-            placeholder="Ex: Lisboa"
+            placeholder={cityPlaceholder}
             value={form.county}
             onChange={(e) => setForm((p) => ({ ...p, county: e.target.value }))}
             className="h-11 rounded-xl"
@@ -341,12 +565,14 @@ function StepAgency({
 function StepConfirm({
   selectedPlanId,
   agency,
+  billingCountry,
   onConfirm,
   onBack,
   submitting,
 }: {
   selectedPlanId: PlanId;
   agency: AgencySetup;
+  billingCountry: BillingCountry | null;
   onConfirm: () => void;
   onBack: () => void;
   submitting: boolean;
@@ -358,6 +584,20 @@ function StepConfirm({
 
   const isTrial = plan.id === 'trial';
   const isScale = plan.id === 'scale';
+
+  const marketEntry = billingCountry && plan.marketPrices
+    ? plan.marketPrices.find((mp) => mp.market === billingCountry.market) ?? null
+    : null;
+  const displayPrice = marketEntry !== null ? marketEntry.price : plan.price;
+  const currencySymbol = billingCountry?.currency === 'BRL' ? 'R$' : '€';
+
+  // Dynamic button label
+
+  let buttonLabel = 'Confirmar e pagar';
+  if (isTrial) buttonLabel = 'Experimentar grátis';
+  else if (isScale) buttonLabel = 'Falar com a equipa';
+  // Spinner label
+  const loadingLabel = isTrial ? 'A configurar…' : 'Aguarde…';
 
   return (
     <div className="max-w-sm">
@@ -412,11 +652,11 @@ function StepConfirm({
             ) : isTrial ? (
               <>
                 <p className="text-sm font-medium">Grátis</p>
-                <p className="text-xs text-muted-foreground">após trial: €{plans.find((p) => p.id === 'basic')?.price}/mês</p>
+                <p className="text-xs text-muted-foreground">após trial: {currencySymbol}{plans.find((p) => p.id === 'basic')?.marketPrices?.find((mp) => mp.market === billingCountry?.market)?.price ?? plans.find((p) => p.id === 'basic')?.price}/mês</p>
               </>
             ) : (
               <>
-                <p className="text-sm font-medium">€{plan.price}/mês</p>
+                <p className="text-sm font-medium">{currencySymbol}{displayPrice}/mês</p>
               </>
             )}
           </div>
@@ -456,9 +696,9 @@ function StepConfirm({
         className="w-full h-11 rounded-xl font-medium"
       >
         {submitting ? (
-          <><Loader2 className="w-4 h-4 animate-spin mr-2" />A configurar…</>
+          <><Loader2 className="w-4 h-4 animate-spin mr-2" />{loadingLabel}</>
         ) : (
-          'Confirmar e começar'
+          buttonLabel
         )}
       </Button>
     </div>
@@ -468,7 +708,7 @@ function StepConfirm({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 const Onboarding = () => {
   const navigate = useNavigate();
-  const { step, selectedPlanId, agency, submitting, selectPlan, submitAgency, goBack, confirm } =
+  const { step, selectedPlanId, agency, billingCountry, submitting, selectPlan, selectBillingCountry, submitAgency, goBack, confirm } =
     useOnboarding();
 
   // If already onboarded (e.g. direct navigation), redirect in effect
@@ -479,8 +719,12 @@ const Onboarding = () => {
   }, [navigate]);
 
   const handleConfirm = async () => {
-    await confirm();
-    navigate('/dashboard', { replace: true });
+    const redirectedToStripe = await confirm();
+    // Only navigate to dashboard if there was no Stripe redirect.
+    // If redirected, the browser is already leaving — don't touch React Router.
+    if (!redirectedToStripe) {
+      navigate('/dashboard', { replace: true });
+    }
   };
 
   return (
@@ -509,7 +753,11 @@ const Onboarding = () => {
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.22 }}
             >
-              <StepPlan onSelect={selectPlan} />
+              <StepPlan
+                billingCountry={billingCountry}
+                onBillingCountryChange={selectBillingCountry}
+                onSelect={selectPlan}
+              />
             </motion.div>
           )}
 
@@ -521,7 +769,7 @@ const Onboarding = () => {
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.22 }}
             >
-              <StepAgency initial={agency} onSubmit={submitAgency} onBack={goBack} />
+              <StepAgency initial={agency} billingCountry={billingCountry} onSubmit={submitAgency} onBack={goBack} />
             </motion.div>
           )}
 
@@ -536,6 +784,7 @@ const Onboarding = () => {
               <StepConfirm
                 selectedPlanId={selectedPlanId}
                 agency={agency}
+                billingCountry={billingCountry}
                 onConfirm={handleConfirm}
                 onBack={goBack}
                 submitting={submitting}

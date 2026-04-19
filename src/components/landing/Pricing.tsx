@@ -1,15 +1,26 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { usePlans } from '@/plans';
+import { useBillingCountries } from '@/billing-countries/useBillingCountries';
+import { BillingCountrySelect } from '@/billing-countries/BillingCountrySelect';
 import type { Plan } from '@/plans';
+import type { BillingCountry } from '@/billing-countries/useBillingCountries';
 
-function PricingCard({ plan, index }: { plan: Plan; index: number }) {
+function PricingCard({ plan, index, billingCountry }: { plan: Plan; index: number; billingCountry: BillingCountry | null }) {
   const isTrial = plan.id === 'trial';
   const isScale = plan.id === 'scale';
   const isHighlighted = plan.highlighted;
+
+  const marketEntry = billingCountry && plan.marketPrices
+    ? plan.marketPrices.find((mp) => mp.market === billingCountry.market) ?? null
+    : null;
+  const displayPrice = marketEntry !== null ? marketEntry.price : plan.price;
+  const currency = billingCountry?.currency ?? 'EUR';
+  const currencySymbol = currency === 'BRL' ? 'R$' : '€';
 
   return (
     <motion.div
@@ -57,7 +68,7 @@ function PricingCard({ plan, index }: { plan: Plan; index: number }) {
           </>
         ) : (
           <>
-            <span className="font-display text-4xl font-700 tracking-tight">€{plan.price}</span>
+            <span className="font-display text-4xl font-700 tracking-tight">{currencySymbol}{displayPrice}</span>
             <span className="text-xs text-muted-foreground">/mês</span>
           </>
         )}
@@ -117,6 +128,16 @@ function PricingCard({ plan, index }: { plan: Plan; index: number }) {
 
 const Pricing = () => {
   const { plans, loading } = usePlans();
+  const { countries, loading: countriesLoading } = useBillingCountries();
+  const [billingCountry, setBillingCountry] = useState<BillingCountry | null>(null);
+
+  // Default to Portugal, fall back to first country
+  useEffect(() => {
+    if (!billingCountry && countries.length > 0) {
+      const pt = countries.find((c) => c.countryCode === 'PT') ?? countries[0];
+      setBillingCountry(pt);
+    }
+  }, [countries, billingCountry]);
 
   return (
     <section id="pricing" className="py-28 md:py-36">
@@ -134,6 +155,17 @@ const Pricing = () => {
           <p className="text-muted-foreground text-base max-w-md mx-auto leading-relaxed">
             Comece grátis, cresça ao seu ritmo. Sem contratos, sem taxas escondidas.
           </p>
+
+          {/* Billing country selector */}
+          <div className="flex items-center justify-center gap-3 mt-8">
+            <span className="text-sm text-muted-foreground">País de faturação:</span>
+            <BillingCountrySelect
+              countries={countries}
+              value={billingCountry}
+              onChange={setBillingCountry}
+              loading={countriesLoading}
+            />
+          </div>
         </motion.div>
 
         {loading ? (
@@ -144,7 +176,7 @@ const Pricing = () => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 items-stretch">
             {plans.map((plan, i) => (
-              <PricingCard key={plan.id} plan={plan} index={i} />
+              <PricingCard key={plan.id} plan={plan} index={i} billingCountry={billingCountry} />
             ))}
           </div>
         )}
