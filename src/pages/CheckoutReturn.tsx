@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { apiFetch } from '@/lib/api-client';
+import { useAuth } from '@/contexts/AuthContext';
 
 type SyncStatus = 'syncing' | 'success' | 'error';
 
 export default function CheckoutReturn() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { refreshSession } = useAuth();
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('syncing');
 
   useEffect(() => {
@@ -17,17 +19,20 @@ export default function CheckoutReturn() {
       method: 'POST',
       body: JSON.stringify({ sessionId: sessionId ?? undefined }),
     })
-      .then(() => {
+      .then(async () => {
+        // Refresh auth context so SubscriptionGuard sees the new active status
+        await refreshSession();
         setSyncStatus('success');
-        // Short delay so the user sees the success feedback
         setTimeout(() => navigate('/dashboard', { replace: true }), 1500);
       })
-      .catch(() => {
+      .catch(async () => {
+        // Try to refresh anyway — webhook may have already activated it
+        try { await refreshSession(); } catch { /* ignore */ }
         setSyncStatus('error');
-        // Navigate to dashboard anyway — subscription may already be active
         setTimeout(() => navigate('/dashboard', { replace: true }), 3000);
       });
-  }, [navigate, searchParams]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">

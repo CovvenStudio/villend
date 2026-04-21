@@ -15,6 +15,7 @@ import Appointments from "./pages/Appointments.tsx";
 import Login from "./pages/Login.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import ProtectedRoute from "./components/ProtectedRoute.tsx";
+import SubscriptionGuard from "./components/SubscriptionGuard.tsx";
 import VisitBooking from "./pages/VisitBooking.tsx";
 import Onboarding from "./pages/Onboarding.tsx";
 import AgencySelect from "./pages/AgencySelect.tsx";
@@ -41,9 +42,9 @@ const App = () => (
               <Route path="/select-agency" element={<ProtectedRoute><AgencySelect /></ProtectedRoute>} />
               <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
               <Route path="/checkout/success" element={<ProtectedRoute><CheckoutReturn /></ProtectedRoute>} />
-              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-              <Route path="/dashboard/agentes" element={<ProtectedRoute><Agents /></ProtectedRoute>} />
-              <Route path="/dashboard/agendamentos" element={<ProtectedRoute><Appointments /></ProtectedRoute>} />
+              <Route path="/dashboard" element={<ProtectedRoute><SubscriptionGuard><Dashboard /></SubscriptionGuard></ProtectedRoute>} />
+              <Route path="/dashboard/agentes" element={<ProtectedRoute><SubscriptionGuard><Agents /></SubscriptionGuard></ProtectedRoute>} />
+              <Route path="/dashboard/agendamentos" element={<ProtectedRoute><SubscriptionGuard><Appointments /></SubscriptionGuard></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

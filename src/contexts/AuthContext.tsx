@@ -13,8 +13,10 @@ import {
   persistSession,
   clearSession,
   hasPersistedSession,
+  refreshTokens,
   type AuthUser,
   type AuthMembership,
+  type AuthSubscription,
 } from '@/lib/auth-api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -25,10 +27,13 @@ interface AuthContextValue {
   status: AuthStatus;
   user: AuthUser | null;
   memberships: AuthMembership[];
+  subscription: AuthSubscription | null;
   currentAgencyId: string | null;
   /** Sign in via Google OAuth access token (obtained from Google button) */
   signIn: (googleAccessToken: string) => Promise<{ needsOnboarding: boolean; multipleAgencies: boolean }>;
   signOut: () => Promise<void>;
+  /** Re-fetches user/memberships/subscription from the server and updates context. */
+  refreshSession: () => Promise<void>;
   /** Set active agency (for multi-agency owners) */
   selectAgency: (agencyId: string) => void;
 }
@@ -43,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [user, setUser] = useState<AuthUser | null>(null);
   const [memberships, setMemberships] = useState<AuthMembership[]>([]);
+  const [subscription, setSubscription] = useState<AuthSubscription | null>(null);
   const [currentAgencyId, setCurrentAgencyId] = useState<string | null>(null);
 
   // On mount: try to restore session from stored refresh token
@@ -52,11 +58,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    getMe()
-      .then(({ user: u, memberships: m }) => {
+    // Explicitly refresh first to get a fresh access token, then fetch user data
+    refreshTokens()
+      .then((ok) => {
+        if (!ok) throw new Error('refresh failed');
+        return getMe();
+      })
+      .then(({ user: u, memberships: m, subscription: s }) => {
         setUser(u);
         setMemberships(m);
-        // Auto-select agency if user has exactly one
+        setSubscription(s);
         if (m.length === 1) setCurrentAgencyId(m[0].agencyId);
         const stored = localStorage.getItem('vyllad_current_agency');
         if (stored && m.some((mb) => mb.agencyId === stored)) {
@@ -75,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     persistSession(session);
     setUser(session.user);
     setMemberships(session.memberships);
+    setSubscription(session.subscription);
 
     if (session.memberships.length === 1) {
       setCurrentAgencyId(session.memberships[0].agencyId);
@@ -95,6 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('vyllad_current_agency');
     setUser(null);
     setMemberships([]);
+    setSubscription(null);
     setCurrentAgencyId(null);
     setStatus('unauthenticated');
   }, []);
@@ -104,9 +117,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('vyllad_current_agency', agencyId);
   }, []);
 
+  const refreshSession = useCallback(async () => {
+    const { user: u, memberships: m, subscription: s } = await getMe();
+    setUser(u);
+    setMemberships(m);
+    setSubscription(s);
+    if (m.length === 1) setCurrentAgencyId(m[0].agencyId);
+    const stored = localStorage.getItem('vyllad_current_agency');
+    if (stored && m.some((mb) => mb.agencyId === stored)) setCurrentAgencyId(stored);
+  }, []);
+
   return (
     <AuthContext.Provider
-      value={{ status, user, memberships, currentAgencyId, signIn, signOut, selectAgency }}
+      value={{ status, user, memberships, subscription, currentAgencyId, signIn, signOut, refreshSession, selectAgency }}
     >
       {children}
     </AuthContext.Provider>

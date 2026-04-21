@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { usePlans } from '@/plans';
-import { useOnboarding, isOnboardingComplete } from '@/onboarding';
+import { useOnboarding } from '@/onboarding';
 import { useBillingCountries } from '@/billing-countries/useBillingCountries';
 import { BillingCountrySelect } from '@/billing-countries/BillingCountrySelect';
 import type { BillingCountry } from '@/billing-countries/useBillingCountries';
@@ -711,12 +711,14 @@ const Onboarding = () => {
   const { step, selectedPlanId, agency, billingCountry, submitting, selectPlan, selectBillingCountry, submitAgency, goBack, confirm } =
     useOnboarding();
 
-  // If already onboarded (e.g. direct navigation), redirect in effect
+  const { memberships } = useAuth();
+
+  // If already onboarded (e.g. direct navigation), redirect
   useEffect(() => {
-    if (isOnboardingComplete()) {
+    if (memberships.length > 0) {
       navigate('/dashboard', { replace: true });
     }
-  }, [navigate]);
+  }, [memberships, navigate]);
 
   const handleConfirm = async () => {
     const redirectedToStripe = await confirm();
