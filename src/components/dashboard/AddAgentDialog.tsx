@@ -1,52 +1,129 @@
 import { useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
+function getPhonePrefix(countryCode: string | null): string {
+  if (countryCode === 'BR') return '+55 ';
+  return '+351 ';
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAdd: (agent: { name: string; email: string; phone: string; specialty: string }) => void;
+  onAdd: (email: string, role: string, phone?: string) => Promise<void>;
+  agencyCountryCode: string | null;
 }
 
-const AddAgentDialog = ({ open, onOpenChange, onAdd }: Props) => {
-  const [form, setForm] = useState({ name: '', email: '', phone: '', specialty: '' });
+const ROLES = [
+  { value: 'MANAGER', label: 'Gerente', description: 'Pode gerir propriedades e agendamentos' },
+  { value: 'AGENT', label: 'Colaborador', description: 'Acesso básico de consulta' },
+];
 
-  const submit = () => {
-    if (!form.name || !form.email) return;
-    onAdd(form);
-    setForm({ name: '', email: '', phone: '', specialty: '' });
-    onOpenChange(false);
+const AddAgentDialog = ({ open, onOpenChange, onAdd, agencyCountryCode }: Props) => {
+  const [form, setForm] = useState({ email: '', phone: getPhonePrefix(agencyCountryCode), role: 'AGENT' });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const isGmail = form.email.toLowerCase().endsWith('@gmail.com');
+  const canSubmit = isGmail && !loading;
+
+  const submit = async () => {
+    if (!canSubmit) return;
+    setError(null);
+    setLoading(true);
+    try {
+      await onAdd(form.email.trim(), form.role, form.phone.trim() || undefined);
+      setForm({ email: '', phone: getPhonePrefix(agencyCountryCode), role: 'AGENT' });
+      onOpenChange(false);
+    } catch (e: unknown) {
+      setError((e as { message?: string })?.message ?? 'Erro ao convidar agente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenChange = (o: boolean) => {
+    if (!loading) {
+      setError(null);
+      onOpenChange(o);
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-display">Adicionar agente</DialogTitle>
+          <DialogTitle className="font-display">Convidar agente</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 pt-2">
           <div>
-            <Label className="text-xs font-medium">Nome completo</Label>
-            <Input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} className="mt-1.5" placeholder="Sofia Ribeiro" />
+            <Label className="text-xs font-medium">Email Gmail <span className="text-destructive">*</span></Label>
+            <Input
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+              className="mt-1.5"
+              placeholder="agente@gmail.com"
+              autoFocus
+            />
+            {form.email && !isGmail && (
+              <p className="text-xs text-destructive mt-1">Apenas endereços @gmail.com são aceites.</p>
+            )}
           </div>
+
           <div>
-            <Label className="text-xs font-medium">Email</Label>
-            <Input type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} className="mt-1.5" placeholder="sofia@vyllad.pt" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs font-medium">Telefone</Label>
-              <Input value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} className="mt-1.5" placeholder="+351 ..." />
+            <Label className="text-xs font-medium mb-2 block">Função <span className="text-destructive">*</span></Label>
+            <div className="grid grid-cols-2 gap-2">
+              {ROLES.map((r) => (
+                <button
+                  key={r.value}
+                  type="button"
+                  onClick={() => setForm((p) => ({ ...p, role: r.value }))}
+                  className={`text-left rounded-xl border px-3 py-2.5 transition-colors ${
+                    form.role === r.value
+                      ? 'border-primary bg-primary/5 text-primary'
+                      : 'border-border hover:border-muted-foreground/40'
+                  }`}
+                >
+                  <p className="text-sm font-semibold">{r.label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{r.description}</p>
+                </button>
+              ))}
             </div>
-            <div>
-              <Label className="text-xs font-medium">Especialidade / zona</Label>
-              <Input value={form.specialty} onChange={(e) => setForm((p) => ({ ...p, specialty: e.target.value }))} className="mt-1.5" placeholder="Lisboa Centro" />
-            </div>
           </div>
-          <Button onClick={submit} disabled={!form.name || !form.email} className="w-full rounded-lg font-semibold">
-            Criar agente
+
+          <div>
+            <Label className="text-xs font-medium">Telefone <span className="text-muted-foreground">(opcional)</span></Label>
+            <Input
+              value={form.phone}
+              onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
+              onFocus={(e) => {
+                const end = e.target.value.length;
+                e.target.setSelectionRange(end, end);
+              }}
+              onClick={(e) => {
+                const prefix = getPhonePrefix(agencyCountryCode);
+                const pos = (e.target as HTMLInputElement).selectionStart ?? 0;
+                if (pos < prefix.length) {
+                  (e.target as HTMLInputElement).setSelectionRange(prefix.length, prefix.length);
+                }
+              }}
+              className="mt-1.5"
+              placeholder="+351 912 000 000"
+            />
+          </div>
+
+          {error && (
+            <p className="text-xs text-destructive rounded-lg bg-destructive/5 border border-destructive/20 px-3 py-2">
+              {error}
+            </p>
+          )}
+
+          <Button onClick={submit} disabled={!canSubmit} className="w-full rounded-lg font-semibold">
+            {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />A enviar convite…</> : 'Enviar convite'}
           </Button>
         </div>
       </DialogContent>

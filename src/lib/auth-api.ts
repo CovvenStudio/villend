@@ -20,6 +20,7 @@ export interface AuthMembership {
   agencyName: string;
   agencySlug: string;
   role: 'OWNER' | 'MANAGER' | 'AGENT';
+  agencyCountryCode: string | null;
 }
 
 export interface AuthSubscription {

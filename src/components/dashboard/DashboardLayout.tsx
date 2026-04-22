@@ -1,22 +1,32 @@
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { Building2, Calendar, UserCog, LogOut, Menu } from 'lucide-react';
+import { Building2, Calendar, UserCog, LogOut, Menu, ChevronsUpDown } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/contexts/AuthContext';
 
+const ROLE_LABEL: Record<string, string> = { OWNER: 'Proprietário', MANAGER: 'Gerente', AGENT: 'Colaborador' };
+
 const navItems = [
   { to: '/dashboard', icon: Building2, label: 'Imóveis', end: true },
-  { to: '/dashboard/agentes', icon: UserCog, label: 'Agentes' },
-  { to: '/dashboard/agendamentos', icon: Calendar, label: 'Agendamentos' },
+  { to: '/agents', icon: UserCog, label: 'Agentes' },
+  { to: '/appointments', icon: Calendar, label: 'Agendamentos' },
 ];
 
 function NavContent({ onNav }: { onNav?: () => void }) {
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user, memberships, currentAgencyId, signOut } = useAuth();
+
+  const currentAgency = memberships.find((m) => m.agencyId === currentAgencyId) ?? null;
+  const hasMultipleAgencies = memberships.length > 1;
 
   const handleSignOut = () => {
     signOut();
     navigate('/login');
+  };
+
+  const handleSwitchAgency = () => {
+    onNav?.();
+    navigate('/select-agency');
   };
 
   return (
@@ -27,6 +37,27 @@ function NavContent({ onNav }: { onNav?: () => void }) {
           <span className="text-accent text-2xl">.</span>
         </Link>
       </div>
+
+      {currentAgency && (
+        <div className="px-3 pt-3">
+          <button
+            onClick={hasMultipleAgencies ? handleSwitchAgency : undefined}
+            disabled={!hasMultipleAgencies}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border bg-muted/40 text-left transition-colors ${
+              hasMultipleAgencies ? 'hover:bg-muted cursor-pointer' : 'cursor-default'
+            }`}
+          >
+            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <Building2 className="w-3.5 h-3.5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold truncate">{currentAgency.agencyName}</p>
+              <p className="text-[10px] text-muted-foreground">{ROLE_LABEL[currentAgency.role] ?? currentAgency.role}</p>
+            </div>
+            {hasMultipleAgencies && <ChevronsUpDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
+          </button>
+        </div>
+      )}
 
       <nav className="flex-1 p-3 space-y-0.5">
         {navItems.map((item) => (
@@ -53,12 +84,23 @@ function NavContent({ onNav }: { onNav?: () => void }) {
         {user && (
           <div className="flex items-center gap-3 px-1">
             {user.avatarUrl ? (
-              <img src={user.avatarUrl} alt={user.name} className="w-9 h-9 rounded-full object-cover ring-2 ring-[#1a2341] ring-offset-1" />
-            ) : (
-              <div className="w-9 h-9 rounded-full bg-[#1a2341]/10 flex items-center justify-center text-sm font-semibold text-[#1a2341] ring-2 ring-[#1a2341] ring-offset-1">
-                {user.name.charAt(0).toUpperCase()}
-              </div>
-            )}
+              <img
+                src={user.avatarUrl}
+                alt={user.name}
+                referrerPolicy="no-referrer"
+                className="w-9 h-9 rounded-full object-cover ring-2 ring-[#1a2341] ring-offset-1"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  (e.currentTarget.nextElementSibling as HTMLElement | null)?.style.setProperty('display', 'flex');
+                }}
+              />
+            ) : null}
+            <div
+              className="w-9 h-9 rounded-full bg-[#1a2341]/10 items-center justify-center text-sm font-semibold text-[#1a2341] ring-2 ring-[#1a2341] ring-offset-1"
+              style={{ display: user.avatarUrl ? 'none' : 'flex' }}
+            >
+              {user.name.charAt(0).toUpperCase()}
+            </div>
             <div className="min-w-0 flex-1">
               <div className="text-xs font-semibold truncate">{user.name}</div>
               <div className="text-[11px] text-muted-foreground truncate">{user.email}</div>

@@ -26,13 +26,15 @@ const Login = () => {
     setLoading(true);
     setError(null);
     try {
-      const { needsOnboarding, multipleAgencies } = await signIn(tokenResponse.access_token);
+      const { needsOnboarding, memberships } = await signIn(tokenResponse.access_token);
       if (needsOnboarding) {
         navigate('/onboarding', { replace: true });
-      } else if (multipleAgencies) {
-        navigate('/select-agency', { replace: true });
-      } else {
+      } else if (memberships.length === 1 && memberships[0].role === 'OWNER') {
+        // Single owner agency — go straight to dashboard
         navigate('/dashboard', { replace: true });
+      } else {
+        // Multiple agencies, or not an owner — show agency select
+        navigate('/select-agency', { replace: true });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao autenticar com o Google.');

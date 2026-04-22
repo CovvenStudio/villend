@@ -439,10 +439,16 @@ function StepAgency({
 
   const [form, setForm] = useState<AgencySetup>(initial);
 
-  // Reset region when country changes so stale value doesn't carry over
+  // Sync country/countryCode into form and reset district when billing country changes
   useEffect(() => {
-    setForm((p) => ({ ...p, district: '' }));
-  }, [billingCountry?.countryCode]);
+    if (!billingCountry) return;
+    setForm((p) => ({
+      ...p,
+      district: '',
+      country: billingCountry.name,
+      countryCode: billingCountry.countryCode,
+    }));
+  }, [billingCountry?.countryCode, billingCountry]);
 
   const valid = form.name.trim().length > 0 && form.county.trim().length > 0 && form.district.length > 0;
 
@@ -708,17 +714,21 @@ function StepConfirm({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 const Onboarding = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { step, selectedPlanId, agency, billingCountry, submitting, selectPlan, selectBillingCountry, submitAgency, goBack, confirm } =
     useOnboarding();
 
   const { memberships } = useAuth();
 
-  // If already onboarded (e.g. direct navigation), redirect
+  // Allow re-entry when ?new=1 is present (user wants to create another account/agency)
+  const isNewAccount = searchParams.get('new') === '1';
+
+  // If already onboarded (e.g. direct navigation) and not explicitly starting fresh, redirect
   useEffect(() => {
-    if (memberships.length > 0) {
+    if (memberships.length > 0 && !isNewAccount) {
       navigate('/dashboard', { replace: true });
     }
-  }, [memberships, navigate]);
+  }, [memberships, navigate, isNewAccount]);
 
   const handleConfirm = async () => {
     const redirectedToStripe = await confirm();

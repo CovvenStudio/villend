@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { AlertTriangle, Building2, ChevronRight, Loader2, LogOut } from 'lucide-react';
+import { AlertTriangle, Building2, ChevronRight, Loader2, LogOut, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/api-client';
+
+const ROLE_LABEL: Record<string, string> = { OWNER: 'Proprietário', MANAGER: 'Gerente', AGENT: 'Colaborador' };
 
 const BLOCKED_STATUSES = ['cancelled', 'past_due'];
 
@@ -16,6 +18,7 @@ const AgencySelect = () => {
 
   const isBlocked = !!subscription && BLOCKED_STATUSES.includes(subscription.status);
   const isPastDue = subscription?.status === 'past_due';
+  const isOwnerAnywhere = memberships.some((m) => m.role === 'OWNER');
 
   const handleSelect = (agencyId: string) => {
     if (isBlocked) return;
@@ -113,12 +116,28 @@ const AgencySelect = () => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate">{m.agencyName}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{m.role.toLowerCase()}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{ROLE_LABEL[m.role] ?? m.role.toLowerCase()}</p>
                   </div>
                   <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
                 </button>
               ))}
             </div>
+
+            {!isOwnerAnywhere && (
+              <div className="mt-6 pt-5 border-t">
+                <p className="text-xs text-muted-foreground text-center mb-3">
+                  Quer gerir os seus próprios imóveis?
+                </p>
+                <Button
+                  variant="outline"
+                  className="w-full h-11 rounded-xl gap-2"
+                  onClick={() => navigate('/onboarding?new=1')}
+                >
+                  <Plus className="w-4 h-4" />
+                  Criar a minha conta
+                </Button>
+              </div>
+            )}
           </>
         )}
 

@@ -30,7 +30,7 @@ interface AuthContextValue {
   subscription: AuthSubscription | null;
   currentAgencyId: string | null;
   /** Sign in via Google OAuth access token (obtained from Google button) */
-  signIn: (googleAccessToken: string) => Promise<{ needsOnboarding: boolean; multipleAgencies: boolean }>;
+  signIn: (googleAccessToken: string) => Promise<{ needsOnboarding: boolean; memberships: import('@/lib/auth-api').AuthMembership[] }>;
   signOut: () => Promise<void>;
   /** Re-fetches user/memberships/subscription from the server and updates context. */
   refreshSession: () => Promise<void>;
@@ -97,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return {
       needsOnboarding: session.needsOnboarding,
-      multipleAgencies: session.memberships.length > 1,
+      memberships: session.memberships,
     };
   }, []);
 

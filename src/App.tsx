@@ -20,6 +20,7 @@ import VisitBooking from "./pages/VisitBooking.tsx";
 import Onboarding from "./pages/Onboarding.tsx";
 import AgencySelect from "./pages/AgencySelect.tsx";
 import CheckoutReturn from "./pages/CheckoutReturn.tsx";
+import AcceptInvite from "./pages/AcceptInvite.tsx";
 
 const queryClient = new QueryClient();
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
@@ -42,9 +43,10 @@ const App = () => (
               <Route path="/select-agency" element={<ProtectedRoute><AgencySelect /></ProtectedRoute>} />
               <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
               <Route path="/checkout/success" element={<ProtectedRoute><CheckoutReturn /></ProtectedRoute>} />
+              <Route path="/invite/:token" element={<AcceptInvite />} />
               <Route path="/dashboard" element={<ProtectedRoute><SubscriptionGuard><Dashboard /></SubscriptionGuard></ProtectedRoute>} />
-              <Route path="/dashboard/agentes" element={<ProtectedRoute><SubscriptionGuard><Agents /></SubscriptionGuard></ProtectedRoute>} />
-              <Route path="/dashboard/agendamentos" element={<ProtectedRoute><SubscriptionGuard><Appointments /></SubscriptionGuard></ProtectedRoute>} />
+              <Route path="/agents" element={<ProtectedRoute><SubscriptionGuard><Agents /></SubscriptionGuard></ProtectedRoute>} />
+              <Route path="/appointments" element={<ProtectedRoute><SubscriptionGuard><Appointments /></SubscriptionGuard></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
