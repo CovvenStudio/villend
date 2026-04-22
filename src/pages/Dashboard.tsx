@@ -3,17 +3,43 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Calendar, CheckCircle, XCircle, Clock, Eye, Filter,
   Zap, Flame, BanIcon, ChevronRight, Users, TrendingUp,
-  ArrowUpRight, CalendarCheck,
+  ArrowUpRight, CalendarCheck, MoreHorizontal, Pencil, PauseCircle, PlayCircle, Archive, KeyRound,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { mockProperties, mockCandidates, mockAgents, mockAppointments } from '@/lib/mock-data';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { mockCandidates, mockAppointments } from '@/lib/mock-data';
 import { Candidate, Property, generateInsight } from '@/lib/types';
+import { PropertyDto } from '@/lib/properties-api';
+import { useProperties } from '@/hooks/useProperties';
+import { useAgents } from '@/hooks/useAgents';
 import AddPropertyDialog from '@/components/dashboard/AddPropertyDialog';
+import EditPropertyDialog from '@/components/dashboard/EditPropertyDialog';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import LeadDetailSheet from '@/components/dashboard/LeadDetailSheet';
+
+// Adapts PropertyDto (API) to the Property shape expected by internal components
+function toProperty(dto: PropertyDto): Property {
+  return {
+    ...dto,
+    description: dto.description ?? '',
+    price: dto.rentalPrice,
+    images: dto.images,
+    availableSlots: [],
+    criteria: {
+      minIncome: dto.criteria.minIncome,
+      maxPeople: dto.criteria.maxPeople,
+      petsAllowed: dto.criteria.petsAllowed,
+      advanceMonths: dto.criteria.advanceMonths,
+      depositMonths: dto.criteria.depositMonths,
+      guarantorRequired: dto.criteria.guarantorRequired,
+      advanceWithoutGuarantor: dto.criteria.advanceWithoutGuarantor ?? undefined,
+      depositWithoutGuarantor: dto.criteria.depositWithoutGuarantor ?? undefined,
+    },
+  };
+}
 
 
 // ─── Priority config ──────────────────────────────────────────────────────────
@@ -272,6 +298,8 @@ function StatsRow({ candidates }: { candidates: Candidate[] }) {
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function Dashboard() {
   const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingPropertyDto, setEditingPropertyDto] = useState<PropertyDto | null>(null);
   const [selectedProperty, setSelectedProperty] = useState<string | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -279,13 +307,17 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [urgencyFilter, setUrgencyFilter] = useState<string>('all');
   const [candidates, setCandidates] = useState<Candidate[]>(mockCandidates);
+  const [propertyStatusFilter, setPropertyStatusFilter] = useState<'active' | 'closed'>('active');
 
-  // Determine which agent is logged in (mock: agent-1)
-  const currentAgent = mockAgents[0];
-  const filteredProperties = mockProperties.filter(p =>
-    p.agentIds.includes(currentAgent.id)
-  );
+  const { properties: propertyDtos, loading: propertiesLoading, setStatus: setPropertyStatus, refresh: refreshProperties } = useProperties();
+  const { agents: realAgents } = useAgents();
+  const filteredProperties = propertyDtos
+    .filter(p => propertyStatusFilter === 'active'
+      ? (p.status === 'ACTIVE' || p.status === 'PAUSED')
+      : (p.status === 'RENTED' || p.status === 'ARCHIVED'))
+    .map(toProperty);
   const effectiveSelected = selectedProperty ?? filteredProperties[0]?.id ?? null;
+  const selectedPropertyDto = propertyDtos.find(p => p.id === effectiveSelected) ?? null;
   const property = filteredProperties.find(p => p.id === effectiveSelected) ?? null;
 
   const propertyCandidates = useMemo(() => {
@@ -317,7 +349,7 @@ export default function Dashboard() {
     setSheetOpen(true);
   }
 
-  const propertyAgents = mockAgents.filter(a => property?.agentIds.includes(a.id));
+  const propertyAgents = realAgents.filter(a => property?.agentIds.includes(a.id));
   const propertyAppointments = mockAppointments.filter(a => a.propertyId === effectiveSelected);
 
   return (
@@ -348,37 +380,144 @@ export default function Dashboard() {
           </Button>
         </motion.div>
 
-        {filteredProperties.length === 0 ? (
+        {propertyDtos.length === 0 ? (
           <div className="rounded-2xl border bg-card p-16 text-center text-muted-foreground">
             <p className="text-sm">Nenhum imóvel atribuído a este agente.</p>
           </div>
         ) : (
           <>
+            {/* Property filter toggle */}
+            <div className="flex items-center gap-2 mb-4">
+              <button
+                onClick={() => { setPropertyStatusFilter('active'); setSelectedProperty(null); }}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${
+                  propertyStatusFilter === 'active'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'border-border text-muted-foreground hover:border-foreground/40'
+                }`}
+              >
+                Ativos
+              </button>
+              <button
+                onClick={() => { setPropertyStatusFilter('closed'); setSelectedProperty(null); }}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${
+                  propertyStatusFilter === 'closed'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'border-border text-muted-foreground hover:border-foreground/40'
+                }`}
+              >
+                Encerrados
+              </button>
+            </div>
+
+            {filteredProperties.length === 0 ? (
+              <div className="rounded-2xl border bg-card p-12 text-center text-muted-foreground">
+                <p className="text-sm">Nenhum imóvel encerrado.</p>
+              </div>
+            ) : (<>
             {/* Property tabs */}
             <div className="flex gap-2.5 mb-8 overflow-x-auto pb-1 -mx-1 px-1">
-              {filteredProperties.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => setSelectedProperty(p.id)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-left shrink-0 transition-all duration-200 ${
-                    effectiveSelected === p.id
-                      ? 'border-primary/30 bg-card shadow-sm'
-                      : 'border-transparent hover:border-border hover:bg-card/50'
-                  }`}
-                >
-                  {p.images && p.images.length > 0 ? (
-                    <img src={p.images[0]} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-base shrink-0">🏠</div>
-                  )}
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold truncate max-w-[160px]">{p.title}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      {(p.rentalPrice ?? p.price) ? `€${(p.rentalPrice ?? p.price)?.toLocaleString('pt-PT')}/mês` : p.referenceId ?? ''}
+              {filteredProperties.map((p) => {
+                const dto = propertyDtos.find(d => d.id === p.id);
+                return (
+                  <div
+                    key={p.id}
+                    className={`relative flex items-center gap-3 px-4 py-3 rounded-xl border text-left shrink-0 transition-all duration-200 cursor-pointer group ${
+                      effectiveSelected === p.id
+                        ? 'border-primary/30 bg-card shadow-sm'
+                        : 'border-transparent hover:border-border hover:bg-card/50'
+                    }`}
+                    onClick={() => setSelectedProperty(p.id)}
+                  >
+                    {p.images && p.images.length > 0 ? (
+                      <img src={p.images[0]} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-base shrink-0">🏠</div>
+                    )}
+                    <div className="min-w-0 pr-5">
+                      <div className="flex items-center gap-1.5">
+                        <div className="text-sm font-semibold truncate max-w-[140px]">{p.title}</div>
+                        {dto?.status === 'PAUSED' && (
+                          <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200 shrink-0">
+                            Pausado
+                          </span>
+                        )}
+                        {dto?.status === 'RENTED' && (
+                          <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200 shrink-0">
+                            Arrendado
+                          </span>
+                        )}
+                        {dto?.status === 'ARCHIVED' && (
+                          <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground border shrink-0">
+                            Retirado
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {(p.rentalPrice ?? p.price) ? `€${(p.rentalPrice ?? p.price)?.toLocaleString('pt-PT')}/mês` : p.referenceId ?? ''}
+                      </div>
                     </div>
+                    {/* Card actions dropdown */}
+                    {dto && (
+                      <div
+                        className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md">
+                              <MoreHorizontal className="w-3.5 h-3.5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-44">
+                            <DropdownMenuItem
+                              onClick={() => { setEditingPropertyDto(dto); setEditOpen(true); }}
+                              className="gap-2"
+                            >
+                              <Pencil className="w-3.5 h-3.5" /> Editar imóvel
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            {dto.status === 'ACTIVE' ? (
+                              <DropdownMenuItem
+                                onClick={() => setPropertyStatus(dto.id, 'PAUSED')}
+                                className="gap-2"
+                              >
+                                <PauseCircle className="w-3.5 h-3.5" /> Pausar
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem
+                                onClick={() => setPropertyStatus(dto.id, 'ACTIVE')}
+                                className="gap-2"
+                              >
+                                <PlayCircle className="w-3.5 h-3.5" /> Retomar
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger className="gap-2 text-destructive focus:text-destructive data-[state=open]:text-destructive">
+                                <Archive className="w-3.5 h-3.5" /> Encerrar
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent className="w-44">
+                                <DropdownMenuItem
+                                  onClick={() => setPropertyStatus(dto.id, 'RENTED')}
+                                  className="gap-2"
+                                >
+                                  <KeyRound className="w-3.5 h-3.5" /> Imóvel arrendado
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => setPropertyStatus(dto.id, 'ARCHIVED')}
+                                  className="gap-2 text-destructive focus:text-destructive"
+                                >
+                                  <Archive className="w-3.5 h-3.5" /> Retirar imóvel
+                                </DropdownMenuItem>
+                              </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    )}
                   </div>
-                </button>
-              ))}
+                );
+              })}
             </div>
 
             {/* Agents row */}
@@ -388,7 +527,7 @@ export default function Dashboard() {
                 <div className="flex items-center gap-2">
                   {propertyAgents.map(a => (
                     <div key={a.id} className="flex items-center gap-1.5">
-                      <img src={a.picture} alt={a.name} className="w-6 h-6 rounded-full object-cover" />
+                      <img src={a.avatarUrl ?? `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(a.name)}`} alt={a.name} referrerPolicy="no-referrer" className="w-6 h-6 rounded-full object-cover" />
                       <span className="font-medium text-foreground">{a.name}</span>
                     </div>
                   ))}
@@ -401,6 +540,58 @@ export default function Dashboard() {
                   >
                     Ver página pública <Eye className="w-3.5 h-3.5" />
                   </Link>
+                )}
+                {selectedPropertyDto && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg shrink-0">
+                        <MoreHorizontal className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      <DropdownMenuItem
+                        onClick={() => { setEditingPropertyDto(selectedPropertyDto); setEditOpen(true); }}
+                        className="gap-2"
+                      >
+                        <Pencil className="w-3.5 h-3.5" /> Editar imóvel
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      {selectedPropertyDto.status === 'ACTIVE' ? (
+                        <DropdownMenuItem
+                          onClick={() => setPropertyStatus(selectedPropertyDto.id, 'PAUSED')}
+                          className="gap-2"
+                        >
+                          <PauseCircle className="w-3.5 h-3.5" /> Pausar
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem
+                          onClick={() => setPropertyStatus(selectedPropertyDto.id, 'ACTIVE')}
+                          className="gap-2"
+                        >
+                          <PlayCircle className="w-3.5 h-3.5" /> Retomar
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger className="gap-2 text-destructive focus:text-destructive data-[state=open]:text-destructive">
+                          <Archive className="w-3.5 h-3.5" /> Encerrar
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent className="w-44">
+                          <DropdownMenuItem
+                            onClick={() => setPropertyStatus(selectedPropertyDto.id, 'RENTED')}
+                            className="gap-2"
+                          >
+                            <KeyRound className="w-3.5 h-3.5" /> Imóvel arrendado
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setPropertyStatus(selectedPropertyDto.id, 'ARCHIVED')}
+                            className="gap-2 text-destructive focus:text-destructive"
+                          >
+                            <Archive className="w-3.5 h-3.5" /> Retirar imóvel
+                          </DropdownMenuItem>
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
               </div>
             )}
@@ -515,11 +706,21 @@ export default function Dashboard() {
                 </AnimatePresence>
               </motion.div>
             )}
+            </>)}
           </>
         )}
       </div>
 
       <AddPropertyDialog open={addOpen} onOpenChange={setAddOpen} />
+
+      {editOpen && editingPropertyDto && (
+        <EditPropertyDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          property={editingPropertyDto}
+          onSaved={refreshProperties}
+        />
+      )}
 
       <LeadDetailSheet
         candidate={selectedCandidate}

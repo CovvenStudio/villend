@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { Building2, Calendar, UserCog, LogOut, Menu, ChevronsUpDown } from 'lucide-react';
+import { Building2, Calendar, UserCog, LogOut, Menu, ChevronsUpDown, ClipboardList } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -10,6 +10,7 @@ const navItems = [
   { to: '/dashboard', icon: Building2, label: 'Imóveis', end: true },
   { to: '/agents', icon: UserCog, label: 'Agentes' },
   { to: '/appointments', icon: Calendar, label: 'Agendamentos' },
+  { to: '/screening', icon: ClipboardList, label: 'Triagem' },
 ];
 
 function NavContent({ onNav }: { onNav?: () => void }) {

@@ -12,6 +12,7 @@ import AnnouncementPublic from "./pages/AnnouncementPublic.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import Agents from "./pages/Agents.tsx";
 import Appointments from "./pages/Appointments.tsx";
+import LeadFormSettings from "./pages/LeadFormSettings.tsx";
 import Login from "./pages/Login.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import ProtectedRoute from "./components/ProtectedRoute.tsx";
@@ -47,6 +48,7 @@ const App = () => (
               <Route path="/dashboard" element={<ProtectedRoute><SubscriptionGuard><Dashboard /></SubscriptionGuard></ProtectedRoute>} />
               <Route path="/agents" element={<ProtectedRoute><SubscriptionGuard><Agents /></SubscriptionGuard></ProtectedRoute>} />
               <Route path="/appointments" element={<ProtectedRoute><SubscriptionGuard><Appointments /></SubscriptionGuard></ProtectedRoute>} />
+              <Route path="/screening" element={<ProtectedRoute><SubscriptionGuard><LeadFormSettings /></SubscriptionGuard></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

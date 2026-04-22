@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -9,31 +9,33 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { CheckCircle2, Check, Loader2, CalendarIcon, X } from 'lucide-react';
-import { Ban, PawPrint } from 'lucide-react';
+import { CheckCircle2, Loader2, CalendarIcon, X, Ban, PawPrint } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAgents } from '@/hooks/useAgents';
 import { useProperties } from '@/hooks/useProperties';
 import { useToast } from '@/hooks/use-toast';
+import { PropertyDto } from '@/lib/properties-api';
+
+type Step = 'info' | 'criteria' | 'agents';
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  property: PropertyDto;
+  onSaved?: () => void;
 }
 
-type Step = 'info' | 'criteria' | 'agents' | 'done';
-
-
-const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
+export default function EditPropertyDialog({ open, onOpenChange, property, onSaved }: Props) {
   const { agents } = useAgents();
-  const { create } = useProperties();
+  const { update } = useProperties();
   const { toast } = useToast();
 
   const [step, setStep] = useState<Step>('info');
   const [submitting, setSubmitting] = useState(false);
-  const [availableFrom, setAvailableFrom] = useState<Date | undefined>(undefined);
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [propertyInfo, setPropertyInfo] = useState({
+
+  const [availableFrom, setAvailableFrom] = useState<Date | undefined>(undefined);
+  const [info, setInfo] = useState({
     title: '',
     referenceId: '',
     announcementLink: '',
@@ -41,7 +43,6 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
     location: '',
     description: '',
   });
-  const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
   const [criteria, setCriteria] = useState({
     minIncome: '',
     maxPeople: '',
@@ -53,24 +54,46 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
     advanceWithoutGuarantor: '4',
     depositWithoutGuarantor: '3',
   });
+  const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
 
-  const handleNext = () => {
-    if (propertyInfo.title && propertyInfo.referenceId && propertyInfo.announcementLink && propertyInfo.rentalPrice) {
-      setStep('criteria');
-    }
-  };
+  // Pre-fill fields whenever the property changes or the dialog opens
+  useEffect(() => {
+    if (!open) return;
+    setStep('info');
+    setInfo({
+      title: property.title,
+      referenceId: property.referenceId ?? '',
+      announcementLink: property.announcementLink ?? '',
+      rentalPrice: String(property.rentalPrice),
+      location: property.location ?? '',
+      description: property.description ?? '',
+    });
+    setAvailableFrom(property.availableFrom ? parseISO(property.availableFrom) : undefined);
+    setCriteria({
+      minIncome: String(property.criteria.minIncome),
+      maxPeople: String(property.criteria.maxPeople),
+      petsAllowed: property.criteria.petsAllowed,
+      allowedPetTypes: property.criteria.allowedPetTypes ?? [],
+      advanceMonths: String(property.criteria.advanceMonths),
+      depositMonths: String(property.criteria.depositMonths),
+      guarantorRequired: property.criteria.guarantorRequired,
+      advanceWithoutGuarantor: String(property.criteria.advanceWithoutGuarantor ?? 4),
+      depositWithoutGuarantor: String(property.criteria.depositWithoutGuarantor ?? 3),
+    });
+    setSelectedAgents(property.agentIds ?? []);
+  }, [open, property]);
 
-  const handleCreate = async () => {
+  const handleSave = async () => {
     setSubmitting(true);
     try {
-      await create({
-        title: propertyInfo.title,
-        referenceId: propertyInfo.referenceId || undefined,
-        announcementLink: propertyInfo.announcementLink || undefined,
-        rentalPrice: parseFloat(propertyInfo.rentalPrice),
-        location: propertyInfo.location || undefined,
+      await update(property.id, {
+        title: info.title,
+        referenceId: info.referenceId || undefined,
+        announcementLink: info.announcementLink || undefined,
+        rentalPrice: parseFloat(info.rentalPrice),
+        location: info.location || undefined,
         availableFrom: availableFrom ? format(availableFrom, 'yyyy-MM-dd') : undefined,
-        description: propertyInfo.description || undefined,
+        description: info.description || undefined,
         agentIds: selectedAgents,
         criteria: {
           minIncome: parseFloat(criteria.minIncome) || 0,
@@ -80,76 +103,94 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
           advanceMonths: parseInt(criteria.advanceMonths) || 2,
           depositMonths: parseInt(criteria.depositMonths) || 2,
           guarantorRequired: criteria.guarantorRequired,
-          advanceWithoutGuarantor: criteria.guarantorRequired ? parseInt(criteria.advanceWithoutGuarantor) || null : null,
-          depositWithoutGuarantor: criteria.guarantorRequired ? parseInt(criteria.depositWithoutGuarantor) || null : null,
+          advanceWithoutGuarantor: criteria.guarantorRequired
+            ? parseInt(criteria.advanceWithoutGuarantor) || null
+            : null,
+          depositWithoutGuarantor: criteria.guarantorRequired
+            ? parseInt(criteria.depositWithoutGuarantor) || null
+            : null,
         },
       });
-      setStep('done');
+      toast({ title: 'Imóvel actualizado!' });
+      onSaved?.();
+      onOpenChange(false);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Erro ao criar imóvel.';
+      const msg = err instanceof Error ? err.message : 'Erro ao actualizar imóvel.';
       toast({ title: 'Erro', description: msg, variant: 'destructive' });
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleClose = () => {
-    setStep('info');
-    setPropertyInfo({ title: '', referenceId: '', announcementLink: '', rentalPrice: '', location: '', description: '' });
-    setAvailableFrom(undefined);
-    setSelectedAgents([]);
-    setCriteria({ minIncome: '', maxPeople: '', petsAllowed: false, allowedPetTypes: [], advanceMonths: '2', depositMonths: '2', guarantorRequired: true, advanceWithoutGuarantor: '4', depositWithoutGuarantor: '3' });
-    onOpenChange(false);
-  };
+  const toggleAgent = (id: string) =>
+    setSelectedAgents(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id],
+    );
 
-  const toggleAgent = (id: string) => {
-    setSelectedAgents((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
-  };
+  const canSaveInfo =
+    info.title && info.rentalPrice;
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg w-full max-h-[90vh] overflow-y-auto">
         <DialogHeader className="sticky top-0 bg-background z-10 pb-2 border-b pr-10">
           <DialogTitle className="font-display">
-            {step === 'info' && 'Novo imóvel'}
+            {step === 'info' && 'Editar imóvel'}
             {step === 'criteria' && 'Critérios de candidatura'}
             {step === 'agents' && 'Agentes responsáveis'}
-            {step === 'done' && 'Imóvel criado!'}
           </DialogTitle>
+          {/* step pills */}
+          <div className="flex gap-1.5 pt-1">
+            {(['info', 'criteria', 'agents'] as Step[]).map((s, i) => (
+              <div
+                key={s}
+                className={cn(
+                  'h-1 flex-1 rounded-full transition-colors',
+                  step === s
+                    ? 'bg-primary'
+                    : i < (['info', 'criteria', 'agents'] as Step[]).indexOf(step)
+                    ? 'bg-primary/40'
+                    : 'bg-muted',
+                )}
+              />
+            ))}
+          </div>
         </DialogHeader>
 
+        {/* ── Step 1: info ─────────────────────────────────────────────────── */}
         {step === 'info' && (
           <div className="space-y-4 pt-2 pb-4">
             <div>
               <Label className="text-sm font-medium">Título do anúncio *</Label>
               <Input
                 placeholder="Ex: T2 renovado em Campo de Ourique"
-                value={propertyInfo.title}
-                onChange={(e) => setPropertyInfo(p => ({ ...p, title: e.target.value }))}
+                value={info.title}
+                onChange={e => setInfo(p => ({ ...p, title: e.target.value }))}
                 className="mt-1"
               />
             </div>
-
             <div>
-              <Label className="text-sm font-medium">ID de referência *</Label>
+              <Label className="text-sm font-medium">
+                ID de referência <span className="text-muted-foreground font-normal">(opcional)</span>
+              </Label>
               <Input
                 placeholder="Ex: IMV-2024-001"
-                value={propertyInfo.referenceId}
-                onChange={(e) => setPropertyInfo(p => ({ ...p, referenceId: e.target.value }))}
+                value={info.referenceId}
+                onChange={e => setInfo(p => ({ ...p, referenceId: e.target.value }))}
                 className="mt-1"
               />
             </div>
-
             <div>
-              <Label className="text-sm font-medium">Link do anúncio *</Label>
+              <Label className="text-sm font-medium">
+                Link do anúncio <span className="text-muted-foreground font-normal">(opcional)</span>
+              </Label>
               <Input
                 placeholder="https://idealista.pt/..."
-                value={propertyInfo.announcementLink}
-                onChange={(e) => setPropertyInfo(p => ({ ...p, announcementLink: e.target.value }))}
+                value={info.announcementLink}
+                onChange={e => setInfo(p => ({ ...p, announcementLink: e.target.value }))}
                 className="mt-1"
               />
             </div>
-
             <div>
               <Label className="text-sm font-medium">Valor do arrendamento *</Label>
               <div className="relative mt-1">
@@ -157,33 +198,34 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
                 <Input
                   type="number"
                   placeholder="1200"
-                  value={propertyInfo.rentalPrice}
-                  onChange={(e) => setPropertyInfo(p => ({ ...p, rentalPrice: e.target.value }))}
+                  value={info.rentalPrice}
+                  onChange={e => setInfo(p => ({ ...p, rentalPrice: e.target.value }))}
                   className="pl-7"
                 />
               </div>
-              <p className="text-[11px] text-muted-foreground mt-1">Serve de base para cálculo dos adiantamentos e cauções</p>
             </div>
-
             <div>
-              <Label className="text-sm font-medium">Localização <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+              <Label className="text-sm font-medium">
+                Localização <span className="text-muted-foreground font-normal">(opcional)</span>
+              </Label>
               <Input
                 placeholder="Ex: Campo de Ourique, Lisboa"
-                value={propertyInfo.location}
-                onChange={(e) => setPropertyInfo(p => ({ ...p, location: e.target.value }))}
+                value={info.location}
+                onChange={e => setInfo(p => ({ ...p, location: e.target.value }))}
                 className="mt-1"
               />
             </div>
-
             <div>
-              <Label className="text-sm font-medium">Disponível a partir de <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+              <Label className="text-sm font-medium">
+                Disponível a partir de <span className="text-muted-foreground font-normal">(opcional)</span>
+              </Label>
               <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                 <PopoverTrigger asChild>
                   <button
                     type="button"
                     className={cn(
                       'mt-1 w-full flex items-center gap-2 px-3 h-9 rounded-lg border border-input bg-transparent text-sm transition-colors hover:border-primary/40 focus:outline-none focus:ring-2 focus:ring-ring/20',
-                      !availableFrom && 'text-muted-foreground'
+                      !availableFrom && 'text-muted-foreground',
                     )}
                   >
                     <CalendarIcon className="w-3.5 h-3.5 shrink-0" />
@@ -196,8 +238,8 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
                       <span
                         role="button"
                         tabIndex={0}
-                        onClick={(e) => { e.stopPropagation(); setAvailableFrom(undefined); }}
-                        onKeyDown={(e) => e.key === 'Enter' && setAvailableFrom(undefined)}
+                        onClick={e => { e.stopPropagation(); setAvailableFrom(undefined); }}
+                        onKeyDown={e => e.key === 'Enter' && setAvailableFrom(undefined)}
                         className="p-0.5 rounded hover:bg-muted transition-colors"
                       >
                         <X className="w-3 h-3" />
@@ -209,29 +251,28 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
                   <Calendar
                     mode="single"
                     selected={availableFrom}
-                    onSelect={(d) => { setAvailableFrom(d); setCalendarOpen(false); }}
-                    disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
+                    onSelect={d => { setAvailableFrom(d); setCalendarOpen(false); }}
                     initialFocus
                     locale={pt}
                   />
                 </PopoverContent>
               </Popover>
             </div>
-
             <div>
-              <Label className="text-sm font-medium">Descrição <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+              <Label className="text-sm font-medium">
+                Descrição <span className="text-muted-foreground font-normal">(opcional)</span>
+              </Label>
               <textarea
                 placeholder="Descreva características especiais do imóvel..."
-                value={propertyInfo.description}
-                onChange={(e) => setPropertyInfo(p => ({ ...p, description: e.target.value }))}
+                value={info.description}
+                onChange={e => setInfo(p => ({ ...p, description: e.target.value }))}
                 rows={3}
                 className="mt-1 w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring/20 resize-none"
               />
             </div>
-
             <Button
-              onClick={handleNext}
-              disabled={!propertyInfo.title || !propertyInfo.referenceId || !propertyInfo.announcementLink || !propertyInfo.rentalPrice}
+              onClick={() => setStep('criteria')}
+              disabled={!canSaveInfo}
               className="w-full rounded-lg font-semibold"
             >
               Continuar
@@ -239,29 +280,30 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
           </div>
         )}
 
+        {/* ── Step 2: criteria ─────────────────────────────────────────────── */}
         {step === 'criteria' && (
           <div className="space-y-4 pt-2 pb-4">
             <div className="p-3 rounded-lg bg-muted/50 border text-sm">
-              <p className="font-medium">{propertyInfo.title}</p>
-              <p className="text-muted-foreground text-xs mt-0.5">Ref: {propertyInfo.referenceId}</p>
+              <p className="font-medium">{info.title}</p>
+              {info.referenceId && <p className="text-muted-foreground text-xs mt-0.5">Ref: {info.referenceId}</p>}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs font-medium">Renda mínima (€)</Label>
-                <Input type="number" placeholder="2400" value={criteria.minIncome} onChange={(e) => setCriteria(p => ({ ...p, minIncome: e.target.value }))} className="mt-1" />
+                <Input type="number" placeholder="2400" value={criteria.minIncome} onChange={e => setCriteria(p => ({ ...p, minIncome: e.target.value }))} className="mt-1" />
               </div>
               <div>
                 <Label className="text-xs font-medium">Máx. pessoas</Label>
-                <Input type="number" placeholder="3" value={criteria.maxPeople} onChange={(e) => setCriteria(p => ({ ...p, maxPeople: e.target.value }))} className="mt-1" />
+                <Input type="number" placeholder="3" value={criteria.maxPeople} onChange={e => setCriteria(p => ({ ...p, maxPeople: e.target.value }))} className="mt-1" />
               </div>
               <div>
                 <Label className="text-xs font-medium">Adiantamento (meses)</Label>
-                <Input type="number" value={criteria.advanceMonths} onChange={(e) => setCriteria(p => ({ ...p, advanceMonths: e.target.value }))} className="mt-1" />
+                <Input type="number" value={criteria.advanceMonths} onChange={e => setCriteria(p => ({ ...p, advanceMonths: e.target.value }))} className="mt-1" />
               </div>
               <div>
                 <Label className="text-xs font-medium">Caução (meses)</Label>
-                <Input type="number" value={criteria.depositMonths} onChange={(e) => setCriteria(p => ({ ...p, depositMonths: e.target.value }))} className="mt-1" />
+                <Input type="number" value={criteria.depositMonths} onChange={e => setCriteria(p => ({ ...p, depositMonths: e.target.value }))} className="mt-1" />
               </div>
             </div>
 
@@ -279,9 +321,7 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
                       type="button"
                       onClick={() => setCriteria(p => ({ ...p, petsAllowed: value, allowedPetTypes: value ? p.allowedPetTypes : [] }))}
                       className={`flex items-center gap-2.5 px-3 py-3 rounded-xl border text-sm font-medium transition-all ${
-                        sel
-                          ? 'border-primary bg-primary/5 text-primary'
-                          : 'border-border hover:border-primary/40 hover:bg-muted/50'
+                        sel ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-primary/40 hover:bg-muted/50'
                       }`}
                     >
                       <Icon className={`w-4 h-4 flex-shrink-0 ${sel ? 'text-primary' : 'text-muted-foreground'}`} />
@@ -294,10 +334,10 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
               <AnimatePresence>
                 {criteria.petsAllowed && (
                   <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="overflow-hidden"
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.15 }}
                   >
                     <div className="pt-3">
                       <p className="text-xs text-muted-foreground mb-2">
@@ -318,12 +358,14 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
                             <button
                               key={label}
                               type="button"
-                              onClick={() => setCriteria(p => ({
-                                ...p,
-                                allowedPetTypes: active
-                                  ? p.allowedPetTypes.filter(t => t !== label)
-                                  : [...p.allowedPetTypes, label],
-                              }))}
+                              onClick={() =>
+                                setCriteria(p => ({
+                                  ...p,
+                                  allowedPetTypes: active
+                                    ? p.allowedPetTypes.filter(t => t !== label)
+                                    : [...p.allowedPetTypes, label],
+                                }))
+                              }
                               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
                                 active ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted/50'
                               }`}
@@ -333,9 +375,6 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
                           );
                         })}
                       </div>
-                      {criteria.allowedPetTypes.length === 0 && (
-                        <p className="text-xs text-muted-foreground/60 mt-2">Nenhum selecionado = todos permitidos</p>
-                      )}
                     </div>
                   </motion.div>
                 )}
@@ -344,7 +383,7 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
 
             <div className="flex items-center justify-between py-2">
               <Label className="text-xs font-medium">Fiador necessário</Label>
-              <Switch checked={criteria.guarantorRequired} onCheckedChange={(v) => setCriteria(p => ({ ...p, guarantorRequired: v }))} />
+              <Switch checked={criteria.guarantorRequired} onCheckedChange={v => setCriteria(p => ({ ...p, guarantorRequired: v }))} />
             </div>
 
             {criteria.guarantorRequired && (
@@ -353,36 +392,33 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-xs">Adiantamento s/ fiador (meses)</Label>
-                    <Input type="number" value={criteria.advanceWithoutGuarantor} onChange={(e) => setCriteria(p => ({ ...p, advanceWithoutGuarantor: e.target.value }))} className="mt-1" />
+                    <Input type="number" value={criteria.advanceWithoutGuarantor} onChange={e => setCriteria(p => ({ ...p, advanceWithoutGuarantor: e.target.value }))} className="mt-1" />
                   </div>
                   <div>
                     <Label className="text-xs">Caução s/ fiador (meses)</Label>
-                    <Input type="number" value={criteria.depositWithoutGuarantor} onChange={(e) => setCriteria(p => ({ ...p, depositWithoutGuarantor: e.target.value }))} className="mt-1" />
+                    <Input type="number" value={criteria.depositWithoutGuarantor} onChange={e => setCriteria(p => ({ ...p, depositWithoutGuarantor: e.target.value }))} className="mt-1" />
                   </div>
                 </div>
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-2 pt-2">
-              <Button onClick={() => setStep('info')} variant="outline" className="rounded-lg font-semibold">
-                Voltar
-              </Button>
-              <Button onClick={() => setStep('agents')} className="rounded-lg font-semibold">
-                Continuar
-              </Button>
+              <Button onClick={() => setStep('info')} variant="outline" className="rounded-lg font-semibold">Voltar</Button>
+              <Button onClick={() => setStep('agents')} className="rounded-lg font-semibold">Continuar</Button>
             </div>
           </div>
         )}
 
+        {/* ── Step 3: agents ───────────────────────────────────────────────── */}
         {step === 'agents' && (
           <div className="space-y-4 pt-2 pb-4">
             <div className="p-3 rounded-lg bg-muted/50 border text-sm">
-              <p className="font-medium">{propertyInfo.title}</p>
-              <p className="text-muted-foreground text-xs mt-0.5">Ref: {propertyInfo.referenceId}</p>
+              <p className="font-medium">{info.title}</p>
+              {info.referenceId && <p className="text-muted-foreground text-xs mt-0.5">Ref: {info.referenceId}</p>}
             </div>
 
             <div className="space-y-2">
-              {agents.filter(a => a.role !== 'OWNER').map((agent) => {
+              {agents.filter(a => a.role !== 'OWNER').map(agent => {
                 const checked = selectedAgents.includes(agent.id);
                 return (
                   <button
@@ -390,24 +426,20 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
                     type="button"
                     onClick={() => toggleAgent(agent.id)}
                     className={`w-full flex items-center gap-3 p-2.5 rounded-lg border text-left transition-all ${
-                      checked ? 'border-accent bg-accent/5' : 'border-border hover:bg-muted/40'
+                      checked ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/40'
                     }`}
                   >
                     <img
                       src={agent.avatarUrl ?? `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(agent.name)}`}
                       alt={agent.name}
                       referrerPolicy="no-referrer"
-                      className="w-8 h-8 rounded-full bg-muted shrink-0"
+                      className="w-8 h-8 rounded-full bg-muted shrink-0 object-cover"
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{agent.name}</div>
-                      <div className="text-xs text-muted-foreground truncate">{agent.email}</div>
+                      <p className="text-sm font-medium truncate">{agent.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{agent.email}</p>
                     </div>
-                    <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                      checked ? 'bg-accent border-accent' : 'border-border'
-                    }`}>
-                      {checked && <Check className="w-3 h-3 text-accent-foreground" />}
-                    </div>
+                    {checked && <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />}
                   </button>
                 );
               })}
@@ -415,34 +447,19 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
                 <p className="text-sm text-muted-foreground text-center py-4">Nenhum agente disponível.</p>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">Selecione um ou mais agentes responsáveis por este imóvel.</p>
 
             <div className="grid grid-cols-2 gap-2 pt-2">
               <Button onClick={() => setStep('criteria')} variant="outline" className="rounded-lg font-semibold">
                 Voltar
               </Button>
-              <Button
-                onClick={handleCreate}
-                disabled={submitting}
-                className="rounded-lg font-semibold"
-              >
-                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Criar imóvel'}
+              <Button onClick={handleSave} disabled={submitting} className="rounded-lg font-semibold gap-2">
+                {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                Guardar alterações
               </Button>
             </div>
-          </div>
-        )}
-
-        {step === 'done' && (
-          <div className="py-8 text-center">
-            <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-4" />
-            <h3 className="font-display text-lg font-bold mb-2">Imóvel criado com sucesso!</h3>
-            <p className="text-sm text-muted-foreground mb-6">O imóvel está ativo e pronto para receber candidaturas.</p>
-            <Button onClick={handleClose} className="rounded-lg font-semibold">Fechar</Button>
           </div>
         )}
       </DialogContent>
     </Dialog>
   );
-};
-
-export default AddPropertyDialog;
+}

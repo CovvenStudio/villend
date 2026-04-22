@@ -1,19 +1,63 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, BedDouble, Bath, Maximize2, ArrowLeft, ChevronLeft, ChevronRight, X, ExternalLink } from 'lucide-react';
+import { MapPin, ArrowLeft, ChevronLeft, ChevronRight, X, ExternalLink, Loader2, CalendarDays } from 'lucide-react';
+import { format } from 'date-fns';
+import { pt } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
-import { mockProperties } from '@/lib/mock-data';
+import { getPublicProperty, PropertyDto } from '@/lib/properties-api';
+import { getPublicScreening, PublicScreeningDto } from '@/lib/screening-api';
+import { Property } from '@/lib/types';
 import LeadForm from '@/components/property/LeadForm';
 import heroVillaImg from '@/assets/hero-villa.jpg';
 
+function toLeadProperty(dto: PropertyDto): Property {
+  return {
+    ...dto,
+    description: dto.description ?? '',
+    price: dto.rentalPrice,
+    availableSlots: [],
+    criteria: {
+      minIncome: dto.criteria.minIncome,
+      maxPeople: dto.criteria.maxPeople,
+      petsAllowed: dto.criteria.petsAllowed,
+      advanceMonths: dto.criteria.advanceMonths,
+      depositMonths: dto.criteria.depositMonths,
+      guarantorRequired: dto.criteria.guarantorRequired,
+      advanceWithoutGuarantor: dto.criteria.advanceWithoutGuarantor ?? undefined,
+      depositWithoutGuarantor: dto.criteria.depositWithoutGuarantor ?? undefined,
+    },
+  };
+}
+
 const PropertyPage = () => {
-  const { slug } = useParams();
-  const property = mockProperties.find((p) => p.slug === slug);
+  const { slug } = useParams<{ slug: string }>();
+  const [property, setProperty] = useState<PropertyDto | null>(null);
+  const [screeningConfig, setScreeningConfig] = useState<PublicScreeningDto | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
   const [currentImage, setCurrentImage] = useState(0);
   const [showForm, setShowForm] = useState(false);
 
-  if (!property) {
+  useEffect(() => {
+    if (!slug) return;
+    setLoading(true);
+    setNotFound(false);
+    Promise.all([getPublicProperty(slug), getPublicScreening(slug)])
+      .then(([prop, screening]) => { setProperty(prop); setScreeningConfig(screening); })
+      .catch(() => setNotFound(true))
+      .finally(() => setLoading(false));
+  }, [slug]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (notFound || !property) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -124,46 +168,23 @@ const PropertyPage = () => {
                 )}
               </div>
 
-              {property.location && (
-                <div className="flex items-center gap-2 text-muted-foreground mb-6">
-                  <MapPin className="w-3.5 h-3.5" />
-                  <span className="text-sm">{property.location}</span>
+              {(property.location || property.availableFrom) && (
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-muted-foreground mb-6">
+                  {property.location && (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-3.5 h-3.5 shrink-0" />
+                      <span className="text-sm">{property.location}</span>
+                    </div>
+                  )}
+                  {property.availableFrom && (
+                    <div className="flex items-center gap-2">
+                      <CalendarDays className="w-3.5 h-3.5 shrink-0" />
+                      <span className="text-sm">Disponível a partir de {format(new Date(property.availableFrom), "d 'de' MMMM 'de' yyyy", { locale: pt })}</span>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Specs row */}
-              {(property.bedrooms !== undefined || property.bathrooms !== undefined || property.area !== undefined || property.floor !== undefined) && (
-              <div className="flex flex-wrap gap-6 mb-8 pb-8 border-b">
-                {property.bedrooms !== undefined && (
-                  <div className="text-center">
-                    <BedDouble className="w-4 h-4 text-muted-foreground mx-auto mb-1.5" />
-                    <div className="text-sm font-semibold">{property.bedrooms}</div>
-                    <div className="text-xs text-muted-foreground">quartos</div>
-                  </div>
-                )}
-                {property.bathrooms !== undefined && (
-                  <div className="text-center">
-                    <Bath className="w-4 h-4 text-muted-foreground mx-auto mb-1.5" />
-                    <div className="text-sm font-semibold">{property.bathrooms}</div>
-                    <div className="text-xs text-muted-foreground">WC</div>
-                  </div>
-                )}
-                {property.area !== undefined && (
-                  <div className="text-center">
-                    <Maximize2 className="w-4 h-4 text-muted-foreground mx-auto mb-1.5" />
-                    <div className="text-sm font-semibold">{property.area}</div>
-                    <div className="text-xs text-muted-foreground">m²</div>
-                  </div>
-                )}
-                {property.floor !== undefined && (
-                  <div className="text-center">
-                    <div className="text-base mx-auto mb-1.5 text-center">🏢</div>
-                    <div className="text-sm font-semibold">{property.floor === 0 ? 'R/C' : `${property.floor}º`}</div>
-                    <div className="text-xs text-muted-foreground">andar</div>
-                  </div>
-                )}
-              </div>
-              )}
 
               {/* Amenities */}
               {(property.hasGarage || property.hasElevator) && (
@@ -186,24 +207,43 @@ const PropertyPage = () => {
               )}
 
               {/* Critérios */}
-              <div className="p-6 rounded-2xl bg-card border mb-4">
-                <h3 className="text-xs font-semibold mb-4 uppercase tracking-[0.15em] text-muted-foreground">Condições de arrendamento</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  {[
-                    { label: 'Renda mínima', value: `€${property.criteria.minIncome.toLocaleString('pt-PT')}` },
-                    { label: 'Máx. pessoas', value: property.criteria.maxPeople },
-                    { label: 'Animais', value: property.criteria.petsAllowed ? '✅ Permitidos' : '❌ Não permitidos' },
-                    { label: 'Fiador', value: property.criteria.guarantorRequired ? 'Necessário' : 'Não necessário' },
-                    { label: 'Adiantamento', value: `${property.criteria.advanceMonths} meses` },
-                    { label: 'Caução', value: `${property.criteria.depositMonths} meses` },
-                  ].map((item) => (
-                    <div key={item.label}>
-                      <span className="text-muted-foreground text-xs">{item.label}</span>
-                      <div className="font-semibold mt-0.5">{item.value}</div>
+              {(() => {
+                const items: { label: string; value: React.ReactNode }[] = [];
+                if (property.criteria.minIncome > 0)
+                  items.push({ label: 'Renda mínima', value: `€${property.criteria.minIncome.toLocaleString('pt-PT')}` });
+                if (property.criteria.maxPeople > 0)
+                  items.push({ label: 'Máx. pessoas', value: property.criteria.maxPeople });
+                items.push({ label: 'Animais', value: property.criteria.petsAllowed ? '✅ Permitidos' : '❌ Não permitidos' });
+                if (property.criteria.petsAllowed && property.criteria.allowedPetTypes && property.criteria.allowedPetTypes.length > 0)
+                  items.push({ label: 'Tipos de animais', value: property.criteria.allowedPetTypes.join(', ') });
+                items.push({ label: 'Fiador', value: property.criteria.guarantorRequired ? 'Necessário' : 'Não necessário' });
+                if (property.criteria.advanceMonths > 0)
+                  items.push({ label: 'Adiantamento', value: `${property.criteria.advanceMonths} meses` });
+                if (property.criteria.depositMonths > 0)
+                  items.push({ label: 'Caução', value: `${property.criteria.depositMonths} meses` });
+                if (property.criteria.advanceWithoutGuarantor)
+                  items.push({ label: 'Adiant. sem fiador', value: `${property.criteria.advanceWithoutGuarantor} meses` });
+                if (property.criteria.depositWithoutGuarantor)
+                  items.push({ label: 'Caução sem fiador', value: `${property.criteria.depositWithoutGuarantor} meses` });
+                if (property.criteria.minContractMonths)
+                  items.push({ label: 'Contrato mínimo', value: `${property.criteria.minContractMonths} meses` });
+                if (property.criteria.smokingAllowed !== null && property.criteria.smokingAllowed !== undefined)
+                  items.push({ label: 'Fumar', value: property.criteria.smokingAllowed ? '✅ Permitido' : '❌ Não permitido' });
+                if (items.length === 0) return null;
+                return (
+                  <div className="p-6 rounded-2xl bg-card border mb-4">
+                    <h3 className="text-xs font-semibold mb-4 uppercase tracking-[0.15em] text-muted-foreground">Condições de arrendamento</h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      {items.map((item) => (
+                        <div key={item.label}>
+                          <span className="text-muted-foreground text-xs">{item.label}</span>
+                          <div className="font-semibold mt-0.5">{item.value}</div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
+                  </div>
+                );
+              })()}
             </motion.div>
           </div>
 
@@ -216,10 +256,10 @@ const PropertyPage = () => {
                 transition={{ delay: 0.2 }}
                 className="rounded-2xl border bg-card p-6"
               >
-                {(property.rentalPrice ?? property.price) ? (
+                {property.rentalPrice ? (
                   <div className="mb-6">
                     <div className="font-display text-3xl font-700 tracking-tight">
-                      €{(property.rentalPrice ?? property.price)?.toLocaleString('pt-PT')}
+                      €{property.rentalPrice.toLocaleString('pt-PT')}
                       <span className="text-base font-400 text-muted-foreground ml-1">/mês</span>
                     </div>
                   </div>
@@ -246,7 +286,7 @@ const PropertyPage = () => {
                           <X className="w-4 h-4 text-muted-foreground" />
                         </button>
                       </div>
-                      <LeadForm property={property} onClose={() => setShowForm(false)} />
+                      <LeadForm property={toLeadProperty(property)} screeningConfig={screeningConfig} onClose={() => setShowForm(false)} />
                     </motion.div>
                   )}
                 </AnimatePresence>

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { PublicScreeningDto, CustomScreeningQuestionDto } from '@/lib/screening-api';
 import {
   CheckCircle2, Loader2, X, ChevronLeft,
   Zap, CalendarDays, Calendar, Eye,
@@ -35,6 +36,7 @@ interface LeadData {
   name: string;
   phone: string;
   email: string;
+  notes: string;
 }
 
 const INCOME_MIDPOINTS: Record<string, number> = {
@@ -143,8 +145,132 @@ const OptionBtn = ({
 
 // ─── Progress Bar ─────────────────────────────────────────────────────────────
 
-const BASE_STEPS = ['urgency', 'household', 'pets', 'income', 'job', 'intent', 'motivation', 'contact'];
-const STEPS_WITH_GUARANTOR = ['urgency', 'household', 'pets', 'income', 'job', 'guarantor', 'intent', 'motivation', 'contact'];
+const BASE_STEPS = ['disclaimer', 'urgency', 'household', 'pets', 'income', 'job', 'intent', 'motivation', 'contact'];
+const STEPS_WITH_GUARANTOR = ['disclaimer', 'urgency', 'household', 'pets', 'income', 'job', 'guarantor', 'intent', 'motivation', 'contact'];
+
+function computeSteps(
+  screeningConfig: PublicScreeningDto | null,
+  includeGuarantor: boolean,
+): string[] {
+  if (!screeningConfig) {
+    return includeGuarantor ? STEPS_WITH_GUARANTOR : BASE_STEPS;
+  }
+  const ordered = screeningConfig.systemQuestions
+    .filter(q => q.enabled)
+    .sort((a, b) => a.order - b.order)
+    .map(q => q.key);
+
+  const result: string[] = [];
+  for (const key of ordered) {
+    result.push(key);
+    if (key === 'job' && includeGuarantor) result.push('guarantor');
+  }
+
+  const customSteps = screeningConfig.customQuestions
+    .sort((a, b) => a.order - b.order)
+    .map(q => `custom_${q.id}`);
+
+  return ['disclaimer', ...result, ...customSteps, 'contact'];
+}
+
+// ─── Custom Question Step ────────────────────────────────────────────────────
+
+function CustomQuestionStep({
+  question,
+  value,
+  onChange,
+  onNext,
+}: {
+  question: CustomScreeningQuestionDto;
+  value: string | string[];
+  onChange: (v: string | string[]) => void;
+  onNext: () => void;
+}) {
+  const strVal = typeof value === 'string' ? value : '';
+  const arrVal = Array.isArray(value) ? value : [];
+
+  const toggleMulti = (opt: string) =>
+    onChange(arrVal.includes(opt) ? arrVal.filter(x => x !== opt) : [...arrVal, opt]);
+
+  return (
+    <div className="space-y-3">
+      <h3 className="font-display text-xl font-bold mb-1">
+        {question.label}
+        {!question.required && (
+          <span className="text-muted-foreground text-sm font-normal ml-2">(opcional)</span>
+        )}
+      </h3>
+      {question.description && (
+        <p className="text-sm text-muted-foreground mb-4">{question.description}</p>
+      )}
+
+      {question.type === 'single_choice' && question.options.map(opt => (
+        <OptionBtn
+          key={opt}
+          label={opt}
+          selected={strVal === opt}
+          onClick={() => { onChange(opt); setTimeout(onNext, 200); }}
+        />
+      ))}
+
+      {question.type === 'multi_choice' && (
+        <>
+          {question.options.map(opt => (
+            <OptionBtn
+              key={opt}
+              label={opt}
+              selected={arrVal.includes(opt)}
+              onClick={() => toggleMulti(opt)}
+            />
+          ))}
+          <Button
+            onClick={onNext}
+            disabled={question.required && arrVal.length === 0}
+            className="w-full rounded-xl mt-2"
+          >
+            Continuar
+          </Button>
+        </>
+      )}
+
+      {question.type === 'boolean' && (
+        <div className="grid grid-cols-2 gap-3">
+          <OptionBtn label="Sim" selected={strVal === 'Sim'} onClick={() => { onChange('Sim'); setTimeout(onNext, 200); }} />
+          <OptionBtn label="Não" selected={strVal === 'Não'} onClick={() => { onChange('Não'); setTimeout(onNext, 200); }} />
+        </div>
+      )}
+
+      {question.type === 'text' && (
+        <>
+          <Input
+            className="h-11 rounded-xl"
+            placeholder="A sua resposta..."
+            value={strVal}
+            onChange={e => onChange(e.target.value)}
+            autoFocus
+          />
+          <Button
+            onClick={onNext}
+            disabled={question.required && !strVal.trim()}
+            className="w-full rounded-xl"
+          >
+            Continuar
+          </Button>
+        </>
+      )}
+
+      {!question.required && question.type !== 'single_choice' && question.type !== 'boolean' && (
+        <button
+          type="button"
+          onClick={onNext}
+          className="w-full text-xs text-muted-foreground hover:text-foreground py-2 transition-colors"
+        >
+          Saltar esta pergunta →
+        </button>
+      )}
+    </div>
+  );
+}
 
 const ProgressBar = ({ current, steps }: { current: string; steps: string[] }) => {
   const idx = steps.indexOf(current);
@@ -186,16 +312,47 @@ const slideVariants = {
   exit: { opacity: 0, x: -30 },
 };
 
-const LeadForm = ({ property, onClose }: { property: Property; onClose: () => void }) => {
+const LeadForm = ({
+  property,
+  onClose,
+  screeningConfig,
+}: {
+  property: Property;
+  onClose: () => void;
+  screeningConfig: PublicScreeningDto | null;
+}) => {
   const { toast } = useToast();
-  const [step, setStep] = useState<string>('urgency');
+  const [step, setStep] = useState<string>('disclaimer');
   const [data, setData] = useState<LeadData>({
     urgency: '', household: '', hasPets: false, petCount: '', petTypes: [],
     income: '', job: '', hasGuarantor: '', hasVisited: '', motivation: '',
-    name: '', phone: '', email: '',
+    name: '', phone: '', email: '', notes: '',
   });
+  const [customAnswers, setCustomAnswers] = useState<Record<string, string | string[]>>({});
 
-  const steps = needsGuarantorStep(data.job, property.criteria) ? STEPS_WITH_GUARANTOR : BASE_STEPS;
+  // Freeze step list at mount so the total never changes mid-flow.
+  // Whether guarantor is included depends solely on the property criteria,
+  // not on the live value of data.job (which caused the counter to jump).
+  const steps = useMemo(
+    () => computeSteps(screeningConfig, property.criteria.guarantorRequired ?? false),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [screeningConfig, property.criteria.guarantorRequired],
+  );
+
+  function nextAfter(key: string): string {
+    const idx = steps.indexOf(key);
+    if (idx < 0 || idx >= steps.length - 1) return 'contact';
+    return steps[idx + 1];
+  }
+
+  // Job step navigation: if criteria don't require guarantor for this candidate,
+  // skip the guarantor step even though it may be in the frozen steps array.
+  function destAfterJob(jobValue: string): string {
+    if (!property.criteria.guarantorRequired) return nextAfter('job');
+    return needsGuarantorStep(jobValue, property.criteria)
+      ? nextAfter('job')       // → 'guarantor'
+      : nextAfter('guarantor'); // skip to 'intent' (or whatever follows guarantor)
+  }
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ score: number; classification: string } | null>(null);
   const [jobIsOther, setJobIsOther] = useState(false);
@@ -223,10 +380,6 @@ const LeadForm = ({ property, onClose }: { property: Property; onClose: () => vo
       setSubmitting(false);
       setResult({ score, classification });
       setStep('result');
-      toast({
-        title: 'Candidatura enviada!',
-        description: 'A sua candidatura foi recebida com sucesso.',
-      });
     }, 1500);
   };
 
@@ -248,27 +401,63 @@ const LeadForm = ({ property, onClose }: { property: Property; onClose: () => vo
         <div>
           <h3 className="font-display text-xl font-bold mb-2">Candidatura recebida!</h3>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            A sua candidatura foi submetida com sucesso. Iremos análisar o seu perfil e entrará em contacto em breve.
+            A sua candidatura foi submetida com sucesso. Receberá um email assim que os nossos agentes analisarem a sua candidatura.
           </p>
         </div>
         <div className="p-4 rounded-xl bg-muted/50 border text-sm text-left space-y-3">
-          <div className="flex gap-3">
-            <CalendarDays className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-            <p className="text-muted-foreground">Pode acompanhar o estado da sua candidatura através do link que receberá por email.</p>
-          </div>
           <div className="flex gap-3">
             <Home className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
             <p className="text-muted-foreground">Assim que a candidatura for <strong className="text-foreground">aprovada</strong>, poderá marcar a visita ao imóvel diretamente pelo link.</p>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Confirmação enviada para <strong>{data.email}</strong>
-        </p>
       </motion.div>
     );
   }
 
+  // Custom question step renderers (generated from screeningConfig)
+  const customStepContent: Record<string, React.ReactNode> = Object.fromEntries(
+    (screeningConfig?.customQuestions ?? []).map(q => [
+      `custom_${q.id}`,
+      <CustomQuestionStep
+        key={q.id}
+        question={q}
+        value={customAnswers[q.id] ?? (q.type === 'multi_choice' ? [] : '')}
+        onChange={v => setCustomAnswers(prev => ({ ...prev, [q.id]: v }))}
+        onNext={() => next(nextAfter(`custom_${q.id}`))}
+      />,
+    ])
+  );
+
   const stepContent: Record<string, React.ReactNode> = {
+    disclaimer: (
+      <div className="space-y-5">
+        <div className="flex flex-col items-center text-center gap-3 pb-2">
+          <div className="w-12 h-12 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center">
+            <FileCheck2 className="w-6 h-6 text-amber-600" />
+          </div>
+          <div>
+            <h3 className="font-display text-xl font-bold">Antes de começar</h3>
+            <p className="text-sm text-muted-foreground mt-1">Leia com atenção antes de preencher a sua candidatura.</p>
+          </div>
+        </div>
+        <div className="rounded-xl border bg-amber-50/60 p-4 space-y-3 text-sm text-amber-900">
+          <p className="font-semibold">Responsabilidade pela veracidade dos dados</p>
+          <p className="leading-relaxed text-amber-800">
+            Ao preencher este formulário, declara que todas as informações fornecidas são verdadeiras e atualizadas.
+            Qualquer inconsistência ou falsidade nos dados indicados poderá prejudicar a sua candidatura ou resultar na sua eliminação do processo.
+          </p>
+          <p className="leading-relaxed text-amber-800">
+            Se tiver informações adicionais que considere relevantes para a sua candidatura, poderá partilhá-las no último passo do formulário.
+          </p>
+        </div>
+        <Button
+          onClick={() => next(nextAfter('disclaimer'))}
+          className="w-full h-12 rounded-xl font-semibold text-sm"
+        >
+          Compreendo, continuar
+        </Button>
+      </div>
+    ),
     urgency: (
       <div className="space-y-3">
         <h3 className="font-display text-xl font-bold mb-1">Quando planeia mudar-se?</h3>
@@ -281,7 +470,7 @@ const LeadForm = ({ property, onClose }: { property: Property; onClose: () => vo
         ].map(o => (
           <OptionBtn key={o.label} label={o.label} icon={o.icon}
             selected={data.urgency === o.label}
-            onClick={() => { set('urgency', o.label); setTimeout(() => next('household'), 200); }}
+            onClick={() => { set('urgency', o.label); setTimeout(() => next(nextAfter('urgency')), 200); }}
           />
         ))}
       </div>
@@ -299,7 +488,7 @@ const LeadForm = ({ property, onClose }: { property: Property; onClose: () => vo
         ].map(o => (
           <OptionBtn key={o.label} label={o.label} icon={o.icon}
             selected={data.household === o.label}
-            onClick={() => { set('household', o.label); setTimeout(() => next('pets'), 200); }}
+            onClick={() => { set('household', o.label); setTimeout(() => next(nextAfter('household')), 200); }}
           />
         ))}
       </div>
@@ -312,7 +501,7 @@ const LeadForm = ({ property, onClose }: { property: Property; onClose: () => vo
         <div className="grid grid-cols-2 gap-3">
           <OptionBtn label="Não" icon={<Ban className="w-4 h-4" />}
             selected={data.hasPets === false && data.urgency !== ''}
-            onClick={() => { set('hasPets', false); setTimeout(() => next('income'), 200); }}
+            onClick={() => { set('hasPets', false); setTimeout(() => next(nextAfter('pets')), 200); }}
           />
           <OptionBtn label="Sim" icon={<PawPrint className="w-4 h-4" />}
             selected={data.hasPets === true}
@@ -347,7 +536,7 @@ const LeadForm = ({ property, onClose }: { property: Property; onClose: () => vo
                     ))}
                   </div>
                 </div>
-                <Button onClick={() => next('income')} disabled={!data.petCount || data.petTypes.length === 0} className="w-full rounded-xl">
+                <Button onClick={() => next(nextAfter('pets'))} disabled={!data.petCount || data.petTypes.length === 0} className="w-full rounded-xl">
                   Continuar
                 </Button>
               </div>
@@ -369,7 +558,7 @@ const LeadForm = ({ property, onClose }: { property: Property; onClose: () => vo
         ].map(o => (
           <OptionBtn key={o.value} label={o.label} icon={o.icon}
             selected={data.income === o.value}
-            onClick={() => { set('income', o.value); setTimeout(() => next('job'), 200); }}
+            onClick={() => { set('income', o.value); setTimeout(() => next(nextAfter('income')), 200); }}
           />
         ))}
       </div>
@@ -396,8 +585,7 @@ const LeadForm = ({ property, onClose }: { property: Property; onClose: () => vo
               } else {
                 setJobIsOther(false);
                 set('job', o.label);
-                const requiresGuarantor = needsGuarantorStep(o.label, property.criteria);
-                setTimeout(() => next(requiresGuarantor ? 'guarantor' : 'intent'), 200);
+                setTimeout(() => next(destAfterJob(o.label)), 200);
               }
             }}
           />
@@ -415,7 +603,7 @@ const LeadForm = ({ property, onClose }: { property: Property; onClose: () => vo
                 />
                 <Button
                   disabled={!data.job.trim()}
-                  onClick={() => next(needsGuarantorStep('Outro', property.criteria) ? 'guarantor' : 'intent')}
+                  onClick={() => next(destAfterJob(data.job))}
                   className="w-full rounded-xl"
                 >
                   Continuar
@@ -488,7 +676,7 @@ const LeadForm = ({ property, onClose }: { property: Property; onClose: () => vo
                     <p className="text-xs text-amber-600">Sem fiador os valores de entrada são ajustados conforme critérios do imóvel.</p>
                   )}
                 </div>
-                <Button onClick={() => next('intent')} className="w-full rounded-xl mt-3">
+                <Button onClick={() => next(nextAfter('guarantor'))} className="w-full rounded-xl mt-3">
                   Continuar
                 </Button>
               </motion.div>
@@ -505,11 +693,11 @@ const LeadForm = ({ property, onClose }: { property: Property; onClose: () => vo
         <div className="grid grid-cols-2 gap-3">
           <OptionBtn label="Sim" icon={<ThumbsUp className="w-4 h-4" />}
             selected={data.hasVisited === 'Sim'}
-            onClick={() => { set('hasVisited', 'Sim'); setTimeout(() => next('motivation'), 200); }}
+            onClick={() => { set('hasVisited', 'Sim'); setTimeout(() => next(nextAfter('intent')), 200); }}
           />
           <OptionBtn label="Não" icon={<ThumbsDown className="w-4 h-4" />}
             selected={data.hasVisited === 'Não'}
-            onClick={() => { set('hasVisited', 'Não'); setTimeout(() => next('motivation'), 200); }}
+            onClick={() => { set('hasVisited', 'Não'); setTimeout(() => next(nextAfter('intent')), 200); }}
           />
         </div>
       </div>
@@ -533,7 +721,7 @@ const LeadForm = ({ property, onClose }: { property: Property; onClose: () => vo
               } else {
                 setMotivationIsOther(false);
                 set('motivation', o.label);
-                setTimeout(() => next('contact'), 200);
+                setTimeout(() => next(nextAfter('motivation')), 200);
               }
             }}
           />
@@ -551,7 +739,7 @@ const LeadForm = ({ property, onClose }: { property: Property; onClose: () => vo
                 />
                 <Button
                   disabled={!data.motivation.trim()}
-                  onClick={() => next('contact')}
+                  onClick={() => next(nextAfter('motivation'))}
                   className="w-full rounded-xl"
                 >
                   Continuar
@@ -561,7 +749,7 @@ const LeadForm = ({ property, onClose }: { property: Property; onClose: () => vo
           )}
         </AnimatePresence>
         {!motivationIsOther && (
-          <button type="button" onClick={() => next('contact')} className="w-full text-xs text-muted-foreground hover:text-foreground py-2 transition-colors">
+          <button type="button" onClick={() => next(nextAfter('motivation'))} className="w-full text-xs text-muted-foreground hover:text-foreground py-2 transition-colors">
             Saltar esta pergunta →
           </button>
         )}
@@ -571,7 +759,10 @@ const LeadForm = ({ property, onClose }: { property: Property; onClose: () => vo
     contact: (
       <div className="space-y-4">
         <h3 className="font-display text-xl font-bold mb-1">Quase lá! Deixe os seus contactos.</h3>
-        <p className="text-sm text-muted-foreground mb-4">O agente responsável irá contactá-lo para confirmar os próximos passos.</p>
+        <p className="text-sm text-muted-foreground mb-2">O agente responsável irá contactá-lo para confirmar os próximos passos.</p>
+        <div className="rounded-xl border bg-muted/40 px-4 py-3 text-xs text-muted-foreground leading-relaxed mb-2">
+          Tem alguma informação adicional relevante para a sua candidatura? Pode partilhá-la com o agente através do campo de notas abaixo.
+        </div>
         <div>
           <Label className="text-xs font-medium">Nome completo</Label>
           <Input placeholder="Maria Silva" value={data.name} onChange={e => set('name', e.target.value)} className="mt-1 h-11 rounded-xl" />
@@ -584,6 +775,16 @@ const LeadForm = ({ property, onClose }: { property: Property; onClose: () => vo
           <Label className="text-xs font-medium">Email</Label>
           <Input type="email" placeholder="maria@email.com" value={data.email} onChange={e => set('email', e.target.value)} className="mt-1 h-11 rounded-xl" />
         </div>
+        <div>
+          <Label className="text-xs font-medium text-muted-foreground">Notas adicionais (opcional)</Label>
+          <textarea
+            placeholder="Ex: Estou disponível para visita aos fins-de-semana. Tenho carta de recomendação do anterior senhorio..."
+            value={data.notes ?? ''}
+            onChange={e => set('notes', e.target.value)}
+            rows={3}
+            className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+          />
+        </div>
         <Button
           onClick={submit}
           disabled={!data.name || !data.phone || !data.email}
@@ -592,13 +793,13 @@ const LeadForm = ({ property, onClose }: { property: Property; onClose: () => vo
           Enviar candidatura
         </Button>
         <p className="text-[11px] text-muted-foreground text-center">
-          Receberá um email com o resultado da sua candidatura.
+          Receberá um email assim que os nossos agentes analisarem a sua candidatura.
         </p>
       </div>
     ),
   };
 
-  const currentContent = stepContent[step];
+  const currentContent = stepContent[step] ?? customStepContent[step];
 
   return (
     <div className="space-y-4">
