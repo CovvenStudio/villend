@@ -22,7 +22,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   property: PropertyDto;
-  onSaved?: () => void;
+  onSaved?: (updated: PropertyDto) => void;
 }
 
 export default function EditPropertyDialog({ open, onOpenChange, property, onSaved }: Props) {
@@ -86,13 +86,14 @@ export default function EditPropertyDialog({ open, onOpenChange, property, onSav
   const handleSave = async () => {
     setSubmitting(true);
     try {
-      await update(property.id, {
+      const saved = await update(property.id, {
         title: info.title,
         referenceId: info.referenceId || undefined,
         announcementLink: info.announcementLink || undefined,
         rentalPrice: parseFloat(info.rentalPrice),
         location: info.location || undefined,
         availableFrom: availableFrom ? format(availableFrom, 'yyyy-MM-dd') : undefined,
+        clearAvailableFrom: !availableFrom,
         description: info.description || undefined,
         agentIds: selectedAgents,
         criteria: {
@@ -112,7 +113,7 @@ export default function EditPropertyDialog({ open, onOpenChange, property, onSav
         },
       });
       toast({ title: 'Imóvel actualizado!' });
-      onSaved?.();
+      onSaved?.(saved);
       onOpenChange(false);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro ao actualizar imóvel.';

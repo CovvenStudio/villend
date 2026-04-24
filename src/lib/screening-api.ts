@@ -47,7 +47,7 @@ export interface PublicScreeningDto {
 
 export interface SaveScreeningConfigDto {
   overrides: { questionKey: string; enabled: boolean; customOrder?: number }[];
-  customQuestions: Omit<CustomScreeningQuestionDto, 'id'> & { id?: string }[];
+  customQuestions: (Omit<CustomScreeningQuestionDto, 'id'> & { id?: string })[];
 }
 
 export const getAgencyScreeningConfig = (agencyId: string) =>

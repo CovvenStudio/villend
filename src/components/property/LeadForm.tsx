@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Property } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import { submitLead } from '@/lib/leads-api';
 
 // ─── Scoring Engine ──────────────────────────────────────────────────────────
 
@@ -29,9 +30,12 @@ interface LeadData {
   petCount: string;
   petTypes: string[];
   income: string;
+  monthlyCommitments: string;  // new D1
   job: string;
-  hasGuarantor: string; // 'Sim' | 'Não' | '' (só relevante se não tem contrato PT)
+  employmentDuration: string;  // new D2
+  hasGuarantor: string;
   hasVisited: string;
+  stayDuration: string;        // new D4
   motivation: string;
   name: string;
   phone: string;
@@ -145,8 +149,8 @@ const OptionBtn = ({
 
 // ─── Progress Bar ─────────────────────────────────────────────────────────────
 
-const BASE_STEPS = ['disclaimer', 'urgency', 'household', 'pets', 'income', 'job', 'intent', 'motivation', 'contact'];
-const STEPS_WITH_GUARANTOR = ['disclaimer', 'urgency', 'household', 'pets', 'income', 'job', 'guarantor', 'intent', 'motivation', 'contact'];
+const BASE_STEPS = ['disclaimer', 'urgency', 'household', 'pets', 'income', 'commitments', 'job', 'employmentDuration', 'intent', 'stayDuration', 'motivation', 'contact'];
+const STEPS_WITH_GUARANTOR = ['disclaimer', 'urgency', 'household', 'pets', 'income', 'commitments', 'job', 'employmentDuration', 'guarantor', 'intent', 'stayDuration', 'motivation', 'contact'];
 
 function computeSteps(
   screeningConfig: PublicScreeningDto | null,
@@ -162,8 +166,9 @@ function computeSteps(
 
   const result: string[] = [];
   for (const key of ordered) {
+    // guarantor is conditional on employment type — skip if not applicable
+    if (key === 'guarantor' && !includeGuarantor) continue;
     result.push(key);
-    if (key === 'job' && includeGuarantor) result.push('guarantor');
   }
 
   const customSteps = screeningConfig.customQuestions
@@ -323,9 +328,12 @@ const LeadForm = ({
 }) => {
   const { toast } = useToast();
   const [step, setStep] = useState<string>('disclaimer');
+  const [stepHistory, setStepHistory] = useState<string[]>([]);
   const [data, setData] = useState<LeadData>({
     urgency: '', household: '', hasPets: false, petCount: '', petTypes: [],
-    income: '', job: '', hasGuarantor: '', hasVisited: '', motivation: '',
+    income: '', monthlyCommitments: '',
+    job: '', employmentDuration: '',
+    hasGuarantor: '', hasVisited: '', stayDuration: '', motivation: '',
     name: '', phone: '', email: '', notes: '',
   });
   const [customAnswers, setCustomAnswers] = useState<Record<string, string | string[]>>({});
@@ -345,13 +353,17 @@ const LeadForm = ({
     return steps[idx + 1];
   }
 
-  // Job step navigation: if criteria don't require guarantor for this candidate,
-  // skip the guarantor step even though it may be in the frozen steps array.
-  function destAfterJob(jobValue: string): string {
-    if (!property.criteria.guarantorRequired) return nextAfter('job');
-    return needsGuarantorStep(jobValue, property.criteria)
-      ? nextAfter('job')       // → 'guarantor'
-      : nextAfter('guarantor'); // skip to 'intent' (or whatever follows guarantor)
+  // After job → always go to employmentDuration first.
+  function destAfterJob(_jobValue: string): string {
+    return nextAfter('job'); // → 'employmentDuration'
+  }
+
+  // After employmentDuration → conditionally skip guarantor step.
+  function destAfterEmploymentDuration(): string {
+    if (!property.criteria.guarantorRequired) return nextAfter('employmentDuration');
+    return needsGuarantorStep(data.job, property.criteria)
+      ? nextAfter('employmentDuration') // → 'guarantor'
+      : nextAfter('guarantor');          // skip to 'intent'
   }
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ score: number; classification: string } | null>(null);
@@ -370,17 +382,42 @@ const LeadForm = ({
     }));
   };
 
-  const next = (nextStep: string) => setStep(nextStep);
+  const next = (nextStep: string) => {
+    setStepHistory(h => [...h, step]);
+    setStep(nextStep);
+  };
 
-  const submit = () => {
+  const submit = async () => {
     setSubmitting(true);
-    const score = calcScore(data, property);
-    const classification = getClassification(score);
-    setTimeout(() => {
-      setSubmitting(false);
-      setResult({ score, classification });
+    try {
+      const res = await submitLead(property.slug, {
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        notes: data.notes || undefined,
+        income: data.income,
+        monthlyCommitments: data.monthlyCommitments,
+        job: data.job,
+        employmentDuration: data.employmentDuration,
+        hasGuarantor: data.hasGuarantor,
+        household: data.household,
+        hasPets: data.hasPets,
+        petTypes: data.petTypes,
+        urgency: data.urgency,
+        stayDuration: data.stayDuration,
+        hasVisited: data.hasVisited,
+        motivation: data.motivation,
+        customAnswers: Object.fromEntries(
+          Object.entries(customAnswers).map(([k, v]) => [k, Array.isArray(v) ? v.join(', ') : v])
+        ),
+      });
+      setResult({ score: res.score, classification: res.classification });
       setStep('result');
-    }, 1500);
+    } catch {
+      toast({ title: 'Erro ao enviar candidatura. Tente novamente.', variant: 'destructive' });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (submitting) {
@@ -547,20 +584,56 @@ const LeadForm = ({
     ),
 
     income: (
-      <div className="space-y-3">
-        <h3 className="font-display text-xl font-bold mb-1">Para garantir que este imóvel se encaixa no seu orçamento…</h3>
-        <p className="text-sm text-muted-foreground mb-4">Qual é o rendimento mensal líquido do agregado familiar?</p>
-        {[
-          { label: 'Menos de €1.000', value: '< €1000', icon: <Banknote className="w-4 h-4" /> },
-          { label: '€1.000 – €2.000', value: '€1000–€2000', icon: <Wallet className="w-4 h-4" /> },
-          { label: '€2.000 – €4.000', value: '€2000–€4000', icon: <CreditCard className="w-4 h-4" /> },
-          { label: 'Mais de €4.000', value: '€4000+', icon: <Gem className="w-4 h-4" /> },
-        ].map(o => (
-          <OptionBtn key={o.value} label={o.label} icon={o.icon}
-            selected={data.income === o.value}
-            onClick={() => { set('income', o.value); setTimeout(() => next(nextAfter('income')), 200); }}
+      <div className="space-y-4">
+        <h3 className="font-display text-xl font-bold mb-1">Qual o rendimento mensal líquido do agregado?</h3>
+        <p className="text-sm text-muted-foreground mb-2">Valor líquido total de todos os membros do agregado que vão residir no imóvel.</p>
+        <div className="relative">
+          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">€</span>
+          <Input
+            type="number"
+            min={0}
+            step={50}
+            placeholder="ex: 2500"
+            value={data.income}
+            onChange={e => set('income', e.target.value)}
+            className="h-12 rounded-xl pl-8 text-base font-mono"
+            autoFocus
           />
-        ))}
+        </div>
+        <Button
+          disabled={!data.income || Number(data.income) <= 0}
+          onClick={() => next(nextAfter('income'))}
+          className="w-full rounded-xl"
+        >
+          Continuar
+        </Button>
+      </div>
+    ),
+
+    commitments: (
+      <div className="space-y-4">
+        <h3 className="font-display text-xl font-bold mb-1">Tem prestações ou encargos mensais fixos?</h3>
+        <p className="text-sm text-muted-foreground mb-2">Indique o valor total mensal (crédito automóvel, habitação, outros). Coloque 0 se não tiver nenhum.</p>
+        <div className="relative">
+          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">€</span>
+          <Input
+            type="number"
+            min={0}
+            step={50}
+            placeholder="ex: 350"
+            value={data.monthlyCommitments}
+            onChange={e => set('monthlyCommitments', e.target.value)}
+            className="h-12 rounded-xl pl-8 text-base font-mono"
+            autoFocus
+          />
+        </div>
+        <Button
+          disabled={data.monthlyCommitments === ''}
+          onClick={() => next(nextAfter('commitments'))}
+          className="w-full rounded-xl"
+        >
+          Continuar
+        </Button>
       </div>
     ),
 
@@ -612,6 +685,24 @@ const LeadForm = ({
             </motion.div>
           )}
         </AnimatePresence>
+      </div>
+    ),
+
+    employmentDuration: (
+      <div className="space-y-3">
+        <h3 className="font-display text-xl font-bold mb-1">Há quanto tempo está na situação profissional actual?</h3>
+        <p className="text-sm text-muted-foreground mb-4">Ajuda-nos a perceber a estabilidade do seu rendimento.</p>
+        {[
+          { label: 'Menos de 6 meses', value: '< 6 meses' },
+          { label: '6 a 12 meses', value: '6–12 meses' },
+          { label: '1 a 3 anos', value: '1–3 anos' },
+          { label: 'Mais de 3 anos', value: 'Mais de 3 anos' },
+        ].map(o => (
+          <OptionBtn key={o.value} label={o.label}
+            selected={data.employmentDuration === o.value}
+            onClick={() => { set('employmentDuration', o.value); setTimeout(() => next(destAfterEmploymentDuration()), 200); }}
+          />
+        ))}
       </div>
     ),
 
@@ -700,6 +791,27 @@ const LeadForm = ({
             onClick={() => { set('hasVisited', 'Não'); setTimeout(() => next(nextAfter('intent')), 200); }}
           />
         </div>
+      </div>
+    ),
+
+    stayDuration: (
+      <div className="space-y-3">
+        <h3 className="font-display text-xl font-bold mb-1">Quanto tempo pretende ficar no imóvel?</h3>
+        <p className="text-sm text-muted-foreground mb-4">Uma ideia aproximada ajuda-nos a perceber os seus planos.</p>
+        {[
+          { label: 'Menos de 1 ano', value: '< 1 ano' },
+          { label: '1 a 2 anos', value: '1–2 anos' },
+          { label: '2 a 3 anos', value: '2–3 anos' },
+          { label: 'Mais de 3 anos', value: '3+ anos' },
+        ].map(o => (
+          <OptionBtn key={o.value} label={o.label}
+            selected={data.stayDuration === o.value}
+            onClick={() => { set('stayDuration', o.value); setTimeout(() => next(nextAfter('stayDuration')), 200); }}
+          />
+        ))}
+        <button type="button" onClick={() => next(nextAfter('stayDuration'))} className="w-full text-xs text-muted-foreground hover:text-foreground py-2 transition-colors">
+          Saltar esta pergunta →
+        </button>
       </div>
     ),
 
@@ -822,8 +934,11 @@ const LeadForm = ({
         <button
           type="button"
           onClick={() => {
-            const idx = steps.indexOf(step);
-            if (idx > 0) setStep(steps[idx - 1]);
+            if (stepHistory.length > 0) {
+              const prev = stepHistory[stepHistory.length - 1];
+              setStepHistory(h => h.slice(0, -1));
+              setStep(prev);
+            }
           }}
           className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors pt-1"
         >

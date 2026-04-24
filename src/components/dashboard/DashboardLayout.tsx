@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { Building2, Calendar, UserCog, LogOut, Menu, ChevronsUpDown, ClipboardList } from 'lucide-react';
+import { Building2, Calendar, UserCog, LogOut, Menu, ChevronsUpDown, ClipboardList, SlidersHorizontal } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -11,6 +11,10 @@ const navItems = [
   { to: '/agents', icon: UserCog, label: 'Agentes' },
   { to: '/appointments', icon: Calendar, label: 'Agendamentos' },
   { to: '/screening', icon: ClipboardList, label: 'Triagem' },
+];
+
+const managerNavItems = [
+  { to: '/scoring', icon: SlidersHorizontal, label: 'Qualificação' },
 ];
 
 function NavContent({ onNav }: { onNav?: () => void }) {
@@ -61,11 +65,11 @@ function NavContent({ onNav }: { onNav?: () => void }) {
       )}
 
       <nav className="flex-1 p-3 space-y-0.5">
-        {navItems.map((item) => (
+        {[...navItems, ...(currentAgency && ['OWNER', 'MANAGER'].includes(currentAgency.role) ? managerNavItems : [])].map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
-            end={item.end}
+            end={('end' in item ? item.end : false) as boolean}
             onClick={onNav}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm w-full transition-all duration-200 ${

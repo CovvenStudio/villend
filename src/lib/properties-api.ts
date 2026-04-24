@@ -81,6 +81,7 @@ export interface UpdatePropertyInput {
   rentalPrice?: number;
   location?: string;
   availableFrom?: string;
+  clearAvailableFrom?: boolean;
   typology?: string;
   bedrooms?: number;
   bathrooms?: number;

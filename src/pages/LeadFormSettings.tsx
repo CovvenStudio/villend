@@ -12,6 +12,7 @@ import {
   AgencyScreeningConfigDto,
   CustomScreeningQuestionDto,
 } from '@/lib/screening-api';
+import { tScreeningCategory, tQuestionLabel, tQuestionDescription, tScreeningOption } from '@/lib/screening-i18n';
 import { toast } from 'sonner';
 
 const TYPE_LABEL: Record<string, string> = {
@@ -125,21 +126,21 @@ export default function LeadFormSettings() {
                 {categories.map(cat => (
                   <div key={cat} className="rounded-2xl border bg-card overflow-hidden">
                     <div className="px-5 py-2.5 border-b bg-muted/30">
-                      <span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{cat}</span>
+                      <span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{tScreeningCategory(cat)}</span>
                     </div>
                     <div className="divide-y">
                       {config.systemQuestions.filter(q => q.category === cat).map(q => (
                         <div key={q.key} className="flex items-center gap-4 px-5 py-4">
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium">{q.label}</p>
+                            <p className="text-sm font-medium">{tQuestionLabel(q.key, q.label)}</p>
                             {q.description && (
-                              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{q.description}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{tQuestionDescription(q.key, q.description)}</p>
                             )}
                             {q.options.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-1.5">
                                 {q.options.map(opt => (
                                   <span key={opt} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border">
-                                    {opt}
+                                    {tScreeningOption(opt)}
                                   </span>
                                 ))}
                               </div>

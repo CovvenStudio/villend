@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Calendar, CheckCircle, XCircle, Clock, Eye, Filter,
-  Zap, Flame, BanIcon, ChevronRight, Users, TrendingUp,
+  Flame, BanIcon, ChevronRight, Users, TrendingUp,
+  Timer,
   ArrowUpRight, CalendarCheck, MoreHorizontal, Pencil, PauseCircle, PlayCircle, Archive, KeyRound,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -10,8 +11,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { mockCandidates, mockAppointments } from '@/lib/mock-data';
-import { Candidate, Property, generateInsight } from '@/lib/types';
+import { mockAppointments } from '@/lib/mock-data';
+import { Candidate, Property } from '@/lib/types';
+import { useLeads } from '@/hooks/useLeads';
 import { PropertyDto } from '@/lib/properties-api';
 import { useProperties } from '@/hooks/useProperties';
 import { useAgents } from '@/hooks/useAgents';
@@ -85,6 +87,20 @@ function ScoreCircle({ score, classification }: { score: number; classification:
 }
 
 
+function quickInsight(c: Candidate): string {
+  const incomeScore   = c.factorScores?.incomeRatio ?? 0;
+  const guarantorScore = c.factorScores?.guarantor  ?? 0;
+  if (c.hasPets && c.score < 50) return 'Animais · compatibilidade baixa com o imóvel';
+  if (c.score >= 80 && c.urgency === 'immediate') return 'Perfil excelente · pronto para fechar';
+  if (c.score >= 80 && c.urgency === 'soon') return 'Excelente perfil · disponível em breve';
+  if (c.score >= 80) return 'Excelente perfil financeiro e laboral';
+  if (c.score >= 60 && c.urgency === 'immediate') return 'Bom perfil · alta urgência de mudança';
+  if (incomeScore < 30) return 'Rendimento abaixo do mínimo recomendado';
+  if (guarantorScore < 40) return 'Garantias insuficientes para este imóvel';
+  if (c.score >= 60) return 'Perfil razoável · sem urgência imediata';
+  return 'Baixa compatibilidade com os critérios';
+}
+
 // ─── Smart Insights Panel ─────────────────────────────────────────────────────
 function SmartInsightsPanel({
   allCandidates,
@@ -110,7 +126,7 @@ function SmartInsightsPanel({
 
   const tabs = [
     { key: 'top' as const, icon: Flame, label: 'Top 5 hoje', count: topLeads.length, color: 'text-orange-500' },
-    { key: 'ready' as const, icon: Zap, label: 'Prontos agora', count: readyNow.length, color: 'text-emerald-500' },
+    { key: 'ready' as const, icon: Timer, label: 'Prontos agora', count: readyNow.length, color: 'text-emerald-500' },
     { key: 'ignore' as const, icon: BanIcon, label: 'Para ignorar', count: ignore.length, color: 'text-muted-foreground' },
   ];
 
@@ -156,9 +172,7 @@ function SmartInsightsPanel({
             <AnimatePresence>
               {displayed.map((c, i) => {
                 const prop = properties.find(p => p.id === c.propertyId);
-                const insight = prop
-                  ? generateInsight(c, prop.criteria, prop.rentalPrice ?? prop.price ?? 0)
-                  : '';
+                const insight = quickInsight(c);
                 return (
                   <motion.button
                     key={c.id}
@@ -178,7 +192,7 @@ function SmartInsightsPanel({
                         <span className="font-semibold text-sm">{c.name}</span>
                         {c.urgency === 'immediate' && (
                           <span className="text-[10px] font-semibold text-emerald-500 flex items-center gap-0.5">
-                            <Zap className="w-3 h-3" />Urgente
+                            <Timer className="w-3 h-3" />Urgente
                           </span>
                         )}
                       </div>
@@ -212,9 +226,7 @@ function LeadCard({
   const priority = getPriorityConfig(candidate);
   const sc = statusConfig[candidate.status];
   const StatusIcon = sc.icon;
-  const insight = property
-    ? generateInsight(candidate, property.criteria, property.rentalPrice ?? property.price ?? 0)
-    : '';
+  const insight = quickInsight(candidate);
 
   return (
     <motion.div
@@ -237,7 +249,7 @@ function LeadCard({
           </span>
           {candidate.urgency === 'immediate' && (
             <span className="text-[10px] font-semibold text-emerald-500 flex items-center gap-0.5">
-              <Zap className="w-3 h-3" />Agora
+              <Timer className="w-3 h-3" />Agora
             </span>
           )}
         </div>
@@ -306,7 +318,6 @@ export default function Dashboard() {
   const [scoreFilter, setScoreFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [urgencyFilter, setUrgencyFilter] = useState<string>('all');
-  const [candidates, setCandidates] = useState<Candidate[]>(mockCandidates);
   const [propertyStatusFilter, setPropertyStatusFilter] = useState<'active' | 'closed'>('active');
 
   const { properties: propertyDtos, loading: propertiesLoading, setStatus: setPropertyStatus, refresh: refreshProperties } = useProperties();
@@ -320,9 +331,10 @@ export default function Dashboard() {
   const selectedPropertyDto = propertyDtos.find(p => p.id === effectiveSelected) ?? null;
   const property = filteredProperties.find(p => p.id === effectiveSelected) ?? null;
 
+  const { candidates, scoringConfig, setStatus: setLeadStatus, refresh: refreshLeads } = useLeads(effectiveSelected);
+
   const propertyCandidates = useMemo(() => {
     return candidates
-      .filter(c => c.propertyId === effectiveSelected)
       .filter(c => scoreFilter === 'all' || (
         scoreFilter === 'high' ? c.score >= 80 :
         scoreFilter === 'mid' ? c.score >= 60 && c.score < 80 :
@@ -331,17 +343,20 @@ export default function Dashboard() {
       .filter(c => statusFilter === 'all' || c.status === statusFilter)
       .filter(c => urgencyFilter === 'all' || c.urgency === urgencyFilter)
       .sort((a, b) => b.score - a.score);
-  }, [candidates, effectiveSelected, scoreFilter, statusFilter, urgencyFilter]);
+  }, [candidates, scoreFilter, statusFilter, urgencyFilter]);
 
   const allAgentCandidates = useMemo(() =>
-    candidates.filter(c =>
-      filteredProperties.some(p => p.id === c.propertyId)
-    ),
-    [candidates, filteredProperties]
+    candidates,
+    [candidates]
   );
 
-  function handleStatusChange(id: string, status: Candidate['status']) {
-    setCandidates(prev => prev.map(c => c.id === id ? { ...c, status } : c));
+  const candidateProperty = useMemo(
+    () => selectedCandidate ? (filteredProperties.find(p => p.id === selectedCandidate.propertyId) ?? property) : null,
+    [selectedCandidate, filteredProperties, property]
+  );
+
+  async function handleStatusChange(id: string, status: Candidate['status']) {
+    await setLeadStatus(id, status);
   }
 
   function openCandidate(c: Candidate) {
@@ -662,7 +677,7 @@ export default function Dashboard() {
 
                 <Select value={urgencyFilter} onValueChange={setUrgencyFilter}>
                   <SelectTrigger className="h-8 text-xs rounded-lg w-[120px]">
-                    <Zap className="w-3 h-3 mr-1.5" />
+                    <Timer className="w-3 h-3 mr-1.5" />
                     <SelectValue placeholder="Urgência" />
                   </SelectTrigger>
                   <SelectContent>
@@ -718,13 +733,14 @@ export default function Dashboard() {
           open={editOpen}
           onOpenChange={setEditOpen}
           property={editingPropertyDto}
-          onSaved={refreshProperties}
+          onSaved={(saved) => { setEditingPropertyDto(saved); refreshProperties(); }}
         />
       )}
 
       <LeadDetailSheet
         candidate={selectedCandidate}
-        property={property}
+        property={candidateProperty}
+        scoringConfig={scoringConfig}
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
         onStatusChange={handleStatusChange}

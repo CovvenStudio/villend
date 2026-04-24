@@ -50,6 +50,8 @@ export interface Candidate {
   employmentType: 'permanent' | 'contract' | 'freelancer' | 'student' | 'retired' | 'other';
   employmentDuration: number;
   score: number;
+  /** Per-factor raw scores (0-100). Keys: incomeRatio, commitments, jobType, employmentDuration, guarantor, household, pets, urgency, stayDuration, hasVisited, motivation */
+  factorScores: Record<string, number>;
   classification: 'excellent' | 'potential' | 'low';
   status: 'new' | 'approved' | 'rejected' | 'visit_scheduled';
   scheduledVisit?: string;

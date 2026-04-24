@@ -1,17 +1,21 @@
+import { useState } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   Phone, Mail, Calendar, Users, PawPrint, Briefcase, Clock,
-  TrendingUp, Zap, Target, CheckCircle2, XCircle, CalendarCheck,
+  TrendingUp, Timer, Target, CheckCircle2, XCircle, CalendarCheck, ScanSearch,
 } from 'lucide-react';
-import { Candidate, Property, getScoreBreakdown, generateInsight } from '@/lib/types';
+import { Candidate, Property } from '@/lib/types';
 import { motion } from 'framer-motion';
+import type { ScoringConfigDto } from '@/lib/leads-api';
+import LeadXRayDialog from './LeadXRayDialog';
 
 interface LeadDetailSheetProps {
   candidate: Candidate | null;
   property: Property | null;
+  scoringConfig: ScoringConfigDto | null;
   open: boolean;
   onClose: () => void;
   onStatusChange: (id: string, status: Candidate['status']) => void;
@@ -79,31 +83,52 @@ function ScoreRing({ score, classification }: { score: number; classification: C
   );
 }
 
-export default function LeadDetailSheet({ candidate, property, open, onClose, onStatusChange }: LeadDetailSheetProps) {
+export default function LeadDetailSheet({ candidate, property, scoringConfig, open, onClose, onStatusChange }: LeadDetailSheetProps) {
+  const [xRayOpen, setXRayOpen] = useState(false);
   if (!candidate || !property) return null;
 
   const rentalPrice = property.rentalPrice ?? property.price ?? 0;
-  const breakdown = getScoreBreakdown(candidate, property.criteria, rentalPrice);
-  const insight = generateInsight(candidate, property.criteria, rentalPrice);
-
-  const urgency = urgencyLabel[candidate.urgency ?? 'flexible'];
   const incomeRatio = rentalPrice > 0 ? (candidate.monthlyIncome / rentalPrice).toFixed(1) : '—';
+  const urgency = urgencyLabel[candidate.urgency ?? 'flexible'];
+
+  const d1 = candidate.factorScores
+    ? Math.round(((candidate.factorScores.incomeRatio ?? 0) + (candidate.factorScores.commitments ?? 0)) / 2)
+    : 0;
+  const d2 = candidate.factorScores
+    ? Math.round(((candidate.factorScores.jobType ?? 0) + (candidate.factorScores.employmentDuration ?? 0)) / 2)
+    : 0;
+  const d3 = candidate.factorScores
+    ? Math.round(((candidate.factorScores.guarantor ?? 0) + (candidate.factorScores.household ?? 0) + (candidate.factorScores.pets ?? 0)) / 3)
+    : 0;
+  const d4 = candidate.factorScores
+    ? Math.round(((candidate.factorScores.urgency ?? 0) + (candidate.factorScores.stayDuration ?? 0) + (candidate.factorScores.hasVisited ?? 0) + (candidate.factorScores.motivation ?? 0)) / 4)
+    : 0;
+
+  const insight = (() => {
+    if (candidate.score >= 80 && candidate.urgency === 'immediate') return 'Perfil excelente · pronto para fechar';
+    if (candidate.score >= 80) return 'Excelente perfil financeiro e laboral';
+    if (candidate.score >= 60 && candidate.urgency === 'immediate') return 'Bom perfil · alta urgência de mudança';
+    if (d1 < 30) return 'Rendimento abaixo do mínimo recomendado';
+    if (d3 < 40) return 'Garantias insuficientes para este imóvel';
+    if (candidate.score >= 60) return 'Perfil razoável · sem urgência imediata';
+    return 'Baixa compatibilidade com os critérios';
+  })();
 
   const whyText = (() => {
     const parts: string[] = [];
-    if (breakdown.financial >= 80) parts.push('rendimento acima do necessário');
-    else if (breakdown.financial < 40) parts.push('rendimento abaixo do ideal');
-    if (breakdown.fit === 100) parts.push('100% compatível com os critérios');
-    else if (breakdown.fit < 60) parts.push('incompatibilidades nos critérios');
-    if (breakdown.stability >= 90) parts.push('estabilidade laboral sólida');
+    if (d1 >= 80) parts.push('capacidade financeira sólida');
+    else if (d1 < 40) parts.push('capacidade financeira abaixo do ideal');
+    if (d2 >= 80) parts.push('estabilidade laboral elevada');
+    else if (d2 < 40) parts.push('risco laboral elevado');
+    if (d3 >= 90) parts.push('garantias acima do exigido');
+    else if (d3 < 50) parts.push('garantias insuficientes');
     if (candidate.urgency === 'immediate') parts.push('pronto para se mudar agora');
     else if (candidate.urgency === 'flexible') parts.push('sem urgência de mudança');
-    return parts.length
-      ? parts.join(' · ')
-      : 'Perfil com compatibilidade média com este imóvel';
+    return parts.length ? parts.join(' · ') : 'Perfil com compatibilidade média com este imóvel';
   })();
 
   return (
+    <>
     <Sheet open={open} onOpenChange={onClose}>
       <SheetContent className="w-full sm:max-w-[480px] overflow-y-auto p-0">
         {/* Header */}
@@ -126,7 +151,7 @@ export default function LeadDetailSheet({ candidate, property, open, onClose, on
                    candidate.classification === 'potential' ? 'Avaliar' : 'Desprioritizar'}
                 </span>
                 <span className={`text-xs font-medium ${urgency.color}`}>
-                  <Zap className="w-3 h-3 inline mr-0.5" />{urgency.label}
+                  <Timer className="w-3 h-3 inline mr-0.5" />{urgency.label}
                 </span>
               </div>
             </div>
@@ -142,12 +167,21 @@ export default function LeadDetailSheet({ candidate, property, open, onClose, on
 
         {/* Score breakdown */}
         <div className="p-6 border-b">
-          <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground mb-4">Análise de pontuação</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">Análise de pontuação</h3>
+            {scoringConfig && (
+              <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5 rounded-lg"
+                onClick={() => setXRayOpen(true)}>
+                <ScanSearch className="w-3.5 h-3.5" />
+                Raio-X
+              </Button>
+            )}
+          </div>
           <div className="space-y-4">
-            <ScoreBar label="Capacidade financeira" value={breakdown.financial} color="bg-emerald-500" />
-            <ScoreBar label="Compatibilidade com critérios" value={breakdown.fit} color="bg-blue-500" />
-            <ScoreBar label="Estabilidade laboral" value={breakdown.stability} color="bg-violet-500" />
-            <ScoreBar label="Urgência de mudança" value={breakdown.urgency} color="bg-amber-500" />
+            <ScoreBar label="D1 · Capacidade Financeira" value={d1} color="bg-emerald-500" />
+            <ScoreBar label="D2 · Perfil de Risco" value={d2} color="bg-violet-500" />
+            <ScoreBar label="D3 · Garantias" value={d3} color="bg-blue-500" />
+            <ScoreBar label="D4 · Fit e Intenção" value={d4} color="bg-amber-500" />
           </div>
         </div>
 
@@ -230,5 +264,16 @@ export default function LeadDetailSheet({ candidate, property, open, onClose, on
         </div>
       </SheetContent>
     </Sheet>
+
+    {scoringConfig && (
+      <LeadXRayDialog
+        open={xRayOpen}
+        onClose={() => setXRayOpen(false)}
+        candidate={candidate}
+        property={property}
+        scoringConfig={scoringConfig}
+      />
+    )}
+  </>
   );
 }
