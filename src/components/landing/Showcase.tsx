@@ -1,95 +1,74 @@
 import { motion } from 'framer-motion';
-import lisbonFacade from '@/assets/lisbon-facade.jpg';
-import interiorLiving from '@/assets/interior-living.jpg';
-import interiorKitchen from '@/assets/interior-kitchen.jpg';
+
+const pain = [
+  {
+    stat: '3h+',
+    label: 'por imóvel',
+    description: 'É o tempo médio que um proprietário gasta a filtrar candidatos manualmente — por cada imóvel, por cada ciclo.',
+  },
+  {
+    stat: '60%',
+    label: 'não qualificam',
+    description: 'Seis em cada dez candidatos falham nos critérios básicos. E só percebe isso depois de horas de conversa.',
+  },
+  {
+    stat: '€0',
+    label: 'de retorno no esforço',
+    description: 'Triagem manual não escala. Cada mensagem, cada chamada — tempo que nunca recupera.',
+  },
+];
 
 const Showcase = () => {
   return (
-    <section className="py-24 md:py-32 overflow-hidden">
+    <section className="py-28 md:py-40 bg-primary overflow-hidden">
       <div className="container mx-auto px-6">
+        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="text-center mb-16 max-w-2xl mx-auto"
+          className="max-w-2xl mb-20"
         >
-          <p className="text-xs font-medium tracking-[0.2em] uppercase text-accent mb-4">Imóveis</p>
-          <h2 className="font-display text-3xl md:text-[2.75rem] font-700 tracking-tight mb-5 leading-tight">
-            Apartamentos, vivendas, escritórios.<br className="hidden md:block" />
-            <span className="text-muted-foreground">Tudo num só lugar.</span>
+          <p className="text-xs font-medium tracking-[0.2em] uppercase text-accent mb-5">O problema real</p>
+          <h2 className="font-display text-3xl md:text-[2.75rem] lg:text-5xl font-700 text-primary-foreground leading-tight tracking-tight">
+            O arrendamento está{' '}
+            <span className="text-primary-foreground/40">a custar-lhe</span>{' '}
+            mais do que pensa.
           </h2>
         </motion.div>
 
-        <div className="grid grid-cols-12 gap-4 md:gap-6 max-w-5xl mx-auto">
-          {/* Lisbon facade - large left */}
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="col-span-12 md:col-span-5 row-span-2 relative rounded-3xl overflow-hidden group h-[400px] md:h-[560px]"
-          >
-            <motion.img
-              src={lisbonFacade}
-              alt="Fachada Lisboa"
-              className="w-full h-full object-cover"
-              whileHover={{ scale: 1.05 }}
-              transition={{ duration: 1.2 }}
-              loading="lazy"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-primary/70 via-transparent to-transparent" />
-            <div className="absolute bottom-6 left-6 right-6 text-primary-foreground">
-              <p className="text-xs tracking-[0.2em] uppercase text-accent mb-2">Lisboa</p>
-              <p className="font-display text-xl font-600">Edifícios históricos restaurados</p>
-            </div>
-          </motion.div>
-
-          {/* Living */}
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-            className="col-span-6 md:col-span-7 relative rounded-3xl overflow-hidden group h-[270px]"
-          >
-            <motion.img
-              src={interiorLiving}
-              alt="Sala"
-              className="w-full h-full object-cover"
-              whileHover={{ scale: 1.05 }}
-              transition={{ duration: 1.2 }}
-              loading="lazy"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-primary/60 to-transparent" />
-            <div className="absolute bottom-5 left-5 text-primary-foreground">
-              <p className="text-xs tracking-[0.2em] uppercase text-accent mb-1">Interior</p>
-              <p className="font-display text-lg font-600">Apartamentos modernos</p>
-            </div>
-          </motion.div>
-
-          {/* Kitchen */}
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="col-span-6 md:col-span-7 relative rounded-3xl overflow-hidden group h-[270px]"
-          >
-            <motion.img
-              src={interiorKitchen}
-              alt="Cozinha"
-              className="w-full h-full object-cover"
-              whileHover={{ scale: 1.05 }}
-              transition={{ duration: 1.2 }}
-              loading="lazy"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-primary/60 to-transparent" />
-            <div className="absolute bottom-5 left-5 text-primary-foreground">
-              <p className="text-xs tracking-[0.2em] uppercase text-accent mb-1">Acabamentos</p>
-              <p className="font-display text-lg font-600">Cozinhas premium</p>
-            </div>
-          </motion.div>
+        {/* Pain stats */}
+        <div className="grid md:grid-cols-3 gap-px bg-white/5 rounded-3xl overflow-hidden">
+          {pain.map((item, i) => (
+            <motion.div
+              key={item.stat}
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.1, duration: 0.7 }}
+              className="bg-primary p-10 md:p-12 group hover:bg-white/[0.03] transition-colors duration-500"
+            >
+              <div className="font-display text-6xl md:text-7xl font-700 text-accent leading-none mb-4 tracking-tight">
+                {item.stat}
+              </div>
+              <p className="text-primary-foreground/50 text-xs uppercase tracking-[0.18em] mb-4">{item.label}</p>
+              <p className="text-primary-foreground/60 text-sm leading-relaxed max-w-xs">
+                {item.description}
+              </p>
+            </motion.div>
+          ))}
         </div>
+
+        {/* Bridge line */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.4 }}
+          className="text-center text-primary-foreground/35 text-sm mt-16 tracking-wide"
+        >
+          O vyllad elimina tudo isto — automaticamente, desde o primeiro candidato.
+        </motion.p>
       </div>
     </section>
   );

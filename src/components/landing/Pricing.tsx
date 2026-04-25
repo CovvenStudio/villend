@@ -153,7 +153,7 @@ const Pricing = () => {
             Simples. Transparente.<br className="hidden md:block" /> Sem surpresas.
           </h2>
           <p className="text-muted-foreground text-base max-w-md mx-auto leading-relaxed">
-            Comece grátis, cresça ao seu ritmo. Sem contratos, sem taxas escondidas.
+            Comece grátis. Pague apenas quando precisar de mais. Sem contratos, sem taxas escondidas.
           </p>
 
           {/* Billing country selector */}
