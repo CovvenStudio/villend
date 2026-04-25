@@ -45,10 +45,10 @@ class OnboardingApiRepository implements IOnboardingRepository {
     // If Stripe checkout is needed, redirect the browser
     if (response.stripeCheckoutUrl) {
       window.location.href = response.stripeCheckoutUrl;
-      return { redirectedToStripe: true };
+      return { redirectedToStripe: true, agencyId: response.agency.id };
     }
 
-    return { redirectedToStripe: false };
+    return { redirectedToStripe: false, agencyId: response.agency.id };
   }
 }
 

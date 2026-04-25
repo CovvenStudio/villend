@@ -56,10 +56,10 @@ export function useOnboarding() {
     });
   }, []);
 
-  const confirm = useCallback(async (): Promise<boolean> => {
-    if (!selectedPlanId || !selectedBackendPlanId) return false;
+  const confirm = useCallback(async (): Promise<{ redirectedToStripe: boolean; agencyId: string }> => {
+    if (!selectedPlanId || !selectedBackendPlanId) return { redirectedToStripe: false, agencyId: '' };
     setSubmitting(true);
-    const { redirectedToStripe } = await onboardingApiRepository.complete({
+    const result = await onboardingApiRepository.complete({
       agencyId: '',
       planId: selectedPlanId,
       backendPlanId: selectedBackendPlanId,
@@ -70,8 +70,8 @@ export function useOnboarding() {
       countryCode: billingCountry?.countryCode,
     });
     // Só tira o loading se NÃO for Stripe (ou seja, trial)
-    if (!redirectedToStripe) setSubmitting(false);
-    return redirectedToStripe;
+    if (!result.redirectedToStripe) setSubmitting(false);
+    return result;
   }, [selectedPlanId, selectedBackendPlanId, agency, billingCountry]);
 
   return {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { Building2, Calendar, UserCog, LogOut, Menu, ChevronsUpDown, ClipboardList, SlidersHorizontal, Settings2 } from 'lucide-react';
+import { Building2, Calendar, UserCog, LogOut, Menu, ChevronsUpDown, ClipboardList, SlidersHorizontal, Settings2, CreditCard, Crown, Clock } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -18,13 +18,31 @@ const managerNavItems = [
   { to: '/settings', icon: Settings2, label: 'Configurações' },
 ];
 
+const ownerNavItems = [
+  { to: '/billing', icon: CreditCard, label: 'Faturação' },
+];
+
 function NavContent({ onNav }: { onNav?: () => void }) {
   const navigate = useNavigate();
-  const { user, memberships, currentAgencyId, signOut } = useAuth();
+  const { user, memberships, currentAgencyId, subscription, signOut } = useAuth();
   const [avatarError, setAvatarError] = useState(false);
 
   const currentAgency = memberships.find((m) => m.agencyId === currentAgencyId) ?? null;
   const hasMultipleAgencies = memberships.length > 1;
+  const isOwner = currentAgency?.role === 'OWNER';
+  const isTrial = subscription?.status === 'trialing';
+
+  // Days remaining in trial
+  const trialDaysLeft = (() => {
+    if (!subscription?.trialEndsAt) return null;
+    const diff = new Date(subscription.trialEndsAt).getTime() - Date.now();
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  })();
+
+  const handleUpgrade = () => {
+    onNav?.();
+    navigate('/onboarding/upgrade');
+  };
 
   const handleSignOut = () => {
     signOut();
@@ -67,7 +85,7 @@ function NavContent({ onNav }: { onNav?: () => void }) {
       )}
 
       <nav className="flex-1 p-3 space-y-0.5">
-        {[...navItems, ...(currentAgency && ['OWNER', 'MANAGER'].includes(currentAgency.role) ? managerNavItems : [])].map((item) => (
+        {[...navItems, ...(currentAgency && ['OWNER', 'MANAGER'].includes(currentAgency.role) ? managerNavItems : []), ...(currentAgency?.role === 'OWNER' ? ownerNavItems : [])].map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -88,6 +106,45 @@ function NavContent({ onNav }: { onNav?: () => void }) {
       </nav>
 
       <div className="p-4 border-t space-y-3">
+        {/* Trial banner — only shown to owner while trialing */}
+        {isOwner && isTrial && trialDaysLeft !== null && (
+          <div className={`rounded-xl px-3 py-2.5 space-y-2 border ${
+            trialDaysLeft <= 2
+              ? 'bg-red-50 border-red-200'
+              : trialDaysLeft <= 5
+              ? 'bg-amber-50 border-amber-200'
+              : 'bg-primary/[0.04] border-primary/20'
+          }`}>
+            <div className="flex items-center gap-2">
+              <Clock className={`w-3.5 h-3.5 shrink-0 ${
+                trialDaysLeft <= 2 ? 'text-red-500' : trialDaysLeft <= 5 ? 'text-amber-500' : 'text-primary'
+              }`} />
+              <p className={`text-[11px] font-semibold ${
+                trialDaysLeft <= 2 ? 'text-red-700' : trialDaysLeft <= 5 ? 'text-amber-700' : 'text-foreground'
+              }`}>
+                {trialDaysLeft === 0
+                  ? 'Trial expirado hoje'
+                  : trialDaysLeft === 1
+                  ? '1 dia restante no trial'
+                  : `${trialDaysLeft} dias restantes no trial`}
+              </p>
+            </div>
+            <button
+              onClick={handleUpgrade}
+              className={`w-full flex items-center justify-center gap-1.5 text-[11px] font-semibold py-1.5 rounded-lg transition-colors ${
+                trialDaysLeft <= 2
+                  ? 'bg-red-600 hover:bg-red-700 text-white'
+                  : trialDaysLeft <= 5
+                  ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                  : 'bg-primary hover:bg-primary/90 text-primary-foreground'
+              }`}
+            >
+            <Crown className="w-3 h-3" />
+              Fazer Upgrade
+            </button>
+          </div>
+        )}
+
         {user && (
           <div className="flex items-center gap-3 px-1">
             {user.avatarUrl && !avatarError ? (

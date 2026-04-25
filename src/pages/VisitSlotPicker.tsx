@@ -469,7 +469,7 @@ export default function VisitSlotPicker() {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Nav */}
       <header className="bg-white border-b px-6 py-4 flex items-center gap-3">
-        <p className="text-xl font-bold tracking-tight" style={{ color: '#1a2341' }}>
+        <p className="font-display text-xl font-700 tracking-tight" style={{ color: '#1a2341' }}>
           vyllad<span style={{ color: '#c9a96e' }}>.</span>
         </p>
         {info?.property && (

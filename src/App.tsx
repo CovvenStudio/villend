@@ -25,6 +25,8 @@ import AcceptInvite from "./pages/AcceptInvite.tsx";
 import ScoringConfig from './pages/ScoringConfig';
 import AgencySettings from './pages/AgencySettings';
 import VisitSlotPicker from './pages/VisitSlotPicker';
+import Billing from './pages/Billing';
+import UpgradePlan from './pages/UpgradePlan';
 
 const queryClient = new QueryClient();
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
@@ -54,6 +56,8 @@ const App = () => (
               <Route path="/screening" element={<ProtectedRoute><SubscriptionGuard><LeadFormSettings /></SubscriptionGuard></ProtectedRoute>} />
               <Route path="/scoring" element={<ProtectedRoute><SubscriptionGuard><ScoringConfig /></SubscriptionGuard></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><SubscriptionGuard><AgencySettings /></SubscriptionGuard></ProtectedRoute>} />
+              <Route path="/billing" element={<ProtectedRoute><SubscriptionGuard><Billing /></SubscriptionGuard></ProtectedRoute>} />
+              <Route path="/onboarding/upgrade" element={<ProtectedRoute><UpgradePlan /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

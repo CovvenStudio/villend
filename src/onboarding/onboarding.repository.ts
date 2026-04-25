@@ -8,6 +8,6 @@ export interface IOnboardingRepository {
   /** Fetch persisted onboarding state for the current user */
   getStatus(): Promise<OnboardingState>;
   /** Persist the completed onboarding (agency creation + plan selection).
-   * Returns whether the browser was redirected to Stripe checkout. */
-  complete(submission: OnboardingSubmission): Promise<{ redirectedToStripe: boolean }>;
+   * Returns whether the browser was redirected to Stripe checkout and the new agencyId. */
+  complete(submission: OnboardingSubmission): Promise<{ redirectedToStripe: boolean; agencyId: string }>;
 }
