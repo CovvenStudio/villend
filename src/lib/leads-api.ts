@@ -31,6 +31,11 @@ export interface SubmitLeadResponse {
 
 // ── Lead list ─────────────────────────────────────────────────────────────────
 
+export interface ProposedSlotDto {
+  date: string;        // "YYYY-MM-DD"
+  periodLabel: string; // e.g. "Manhã"
+}
+
 export interface LeadDto {
   id: string;
   propertyId: string;
@@ -54,8 +59,13 @@ export interface LeadDto {
   score: number;
   factorScores: Record<string, number>;
   classification: 'excellent' | 'potential' | 'low';
-  status: 'new' | 'contacted' | 'qualified' | 'rejected' | 'approved';
+  status: 'new' | 'contacted' | 'qualified' | 'rejected' | 'approved' | 'visit_scheduled' | 'visit_cancelled' | 'visit_finished' | 'contracted';
   createdAt: string;
+  proposedSlots: ProposedSlotDto[];
+  visitToken?: string;
+  visitLinkSentAt?: string; // ISO timestamp of last visit link email
+  contractedAt?: string;   // ISO timestamp when contract was signed
+  proposedVisit?: string; // legacy
 }
 
 export interface LeadListResponse {
@@ -137,11 +147,74 @@ export const listLeads = (agencyId: string, propertyId: string, skip = 0, take =
     `/agencies/${agencyId}/properties/${propertyId}/leads?skip=${skip}&take=${take}`,
   );
 
+/** Authenticated — agency-wide (no property filter). Useful for appointments page. */
+export const listLeadsByAgency = (agencyId: string, status?: string, skip = 0, take = 200) => {
+  const qs = new URLSearchParams({ skip: String(skip), take: String(take) });
+  if (status) qs.set('status', status);
+  return apiFetch<LeadListResponse>(`/agencies/${agencyId}/leads?${qs.toString()}`);
+};
+
 export const updateLeadStatus = (agencyId: string, id: string, status: string) =>
   apiFetch<void>(`/agencies/${agencyId}/leads/${id}/status`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
   });
+
+// ── Public: visit scheduling ──────────────────────────────────────────────────
+
+const RAW_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
+
+export interface VisitInfoResponse {
+  lead: {
+    id: string;
+    name: string;
+    email: string;
+    proposedSlots: ProposedSlotDto[];
+  };
+  property?: {
+    id: string;
+    title: string;
+    location?: string;
+  };
+  schedulingConfig?: {
+    periods: { label: string; start: string; end: string }[];
+    availableWeekdays: number[];
+    maxClientChoices: number;
+    agentSlotIntervalMinutes: number;
+  };
+  bookedSlots: { date: string; time: string; agentId: string }[];
+  propertyAgentIds: string[];
+  activeAppointment?: { id: string; cancelToken: string };
+}
+
+export const getVisitInfo = (leadId: string, token: string): Promise<VisitInfoResponse> =>
+  fetch(`${RAW_BASE}/public/leads/${leadId}/visit-info?token=${encodeURIComponent(token)}`)
+    .then(async r => {
+      if (!r.ok) throw new Error(String(r.status));
+      return r.json();
+    });
+
+export const submitProposedSlots = (
+  leadId: string,
+  token: string,
+  slots: ProposedSlotDto[],
+): Promise<void> =>
+  fetch(`${RAW_BASE}/public/leads/${leadId}/proposed-slots?token=${encodeURIComponent(token)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slots }),
+  }).then(async r => {
+    if (!r.ok) throw new Error(String(r.status));
+  });
+
+export const sendVisitLink = (agencyId: string, leadId: string): Promise<void> =>
+  apiFetch(`/agencies/${agencyId}/leads/${leadId}/send-visit-link`, { method: 'POST' });
+
+export const contractLead = (agencyId: string, leadId: string): Promise<LeadDto> =>
+  apiFetch<LeadDto>(`/agencies/${agencyId}/leads/${leadId}/contract`, { method: 'PATCH' });
+
+export const revertContractLead = (agencyId: string, leadId: string): Promise<LeadDto> =>
+  apiFetch<LeadDto>(`/agencies/${agencyId}/leads/${leadId}/revert-contract`, { method: 'PATCH' });
 
 export const getScoringConfig = (agencyId: string) =>
   apiFetch<ScoringConfigDto>(`/agencies/${agencyId}/scoring-config`);

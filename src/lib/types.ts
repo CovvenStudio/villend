@@ -53,7 +53,7 @@ export interface Candidate {
   /** Per-factor raw scores (0-100). Keys: incomeRatio, commitments, jobType, employmentDuration, guarantor, household, pets, urgency, stayDuration, hasVisited, motivation */
   factorScores: Record<string, number>;
   classification: 'excellent' | 'potential' | 'low';
-  status: 'new' | 'approved' | 'rejected' | 'visit_scheduled';
+  status: 'new' | 'approved' | 'rejected' | 'visit_scheduled' | 'visit_cancelled' | 'visit_finished' | 'contracted';
   scheduledVisit?: string;
   createdAt: string;
   notes?: string;

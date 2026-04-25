@@ -1,12 +1,13 @@
 import { useState, useMemo } from 'react';
+import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Calendar, CheckCircle, XCircle, Clock, Eye, Filter,
   Flame, BanIcon, ChevronRight, Users, TrendingUp,
   Timer,
-  ArrowUpRight, CalendarCheck, MoreHorizontal, Pencil, PauseCircle, PlayCircle, Archive, KeyRound,
+  ArrowUpRight, CalendarCheck, MoreHorizontal, Pencil, PauseCircle, PlayCircle, Archive, KeyRound, RotateCcw, Trophy,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -14,6 +15,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { mockAppointments } from '@/lib/mock-data';
 import { Candidate, Property } from '@/lib/types';
 import { useLeads } from '@/hooks/useLeads';
+import { contractLead, revertContractLead } from '@/lib/leads-api';
+import { listAppointments, updateAppointmentStatus } from '@/lib/appointments-api';
+import { useAuth } from '@/contexts/AuthContext';
 import { PropertyDto } from '@/lib/properties-api';
 import { useProperties } from '@/hooks/useProperties';
 import { useAgents } from '@/hooks/useAgents';
@@ -46,6 +50,11 @@ function toProperty(dto: PropertyDto): Property {
 
 // ─── Priority config ──────────────────────────────────────────────────────────
 function getPriorityConfig(c: Candidate) {
+  if (c.status === 'visit_scheduled') return {
+    badge: 'border-blue-200 bg-blue-50 text-blue-600',
+    dot: 'bg-blue-500',
+    label: 'Visita marcada',
+  };
   if (c.score >= 80) return {
     badge: 'border-border/60 bg-card text-foreground',
     dot: 'bg-emerald-500',
@@ -68,6 +77,9 @@ const statusConfig: Record<Candidate['status'], { label: string; icon: typeof Cl
   approved: { label: 'Aprovado', icon: CheckCircle, className: 'bg-emerald-500/10 text-emerald-600' },
   rejected: { label: 'Rejeitado', icon: XCircle, className: 'bg-destructive/10 text-destructive' },
   visit_scheduled: { label: 'Visita marcada', icon: Calendar, className: 'bg-blue-500/10 text-blue-600' },
+  visit_cancelled: { label: 'Visita cancelada', icon: XCircle, className: 'bg-orange-500/10 text-orange-600' },
+  visit_finished: { label: 'Visita realizada', icon: CheckCircle, className: 'bg-emerald-500/10 text-emerald-600' },
+  contracted: { label: 'Contrato fechado', icon: CheckCircle, className: 'bg-violet-500/10 text-violet-600' },
 };
 
 // ─── Score circle ─────────────────────────────────────────────────────────────
@@ -106,10 +118,24 @@ function SmartInsightsPanel({
   allCandidates,
   properties,
   onSelectCandidate,
+  onApprove,
+  onReject,
+  onSchedule,
+  onReschedule,
+  onComplete,
+  onContract,
+  onRevertContract,
 }: {
   allCandidates: Candidate[];
   properties: Property[];
   onSelectCandidate: (c: Candidate) => void;
+  onApprove: (id: string) => void;
+  onReject: (id: string) => void;
+  onSchedule: (c: Candidate) => void;
+  onReschedule: (c: Candidate) => void;
+  onComplete: (c: Candidate) => void;
+  onContract: (c: Candidate) => void;
+  onRevertContract: (c: Candidate) => void;
 }) {
   const topLeads = [...allCandidates]
     .filter(c => c.status !== 'rejected')
@@ -165,49 +191,119 @@ function SmartInsightsPanel({
       </div>
       <div className="p-4">
         <p className="text-xs text-muted-foreground mb-3 font-medium">{subtitles[tab]}</p>
-        {displayed.length === 0 ? (
-          <p className="text-sm text-center text-muted-foreground py-6">Nenhum lead nesta categoria.</p>
-        ) : (
-          <div className="space-y-1">
-            <AnimatePresence>
-              {displayed.map((c, i) => {
-                const prop = properties.find(p => p.id === c.propertyId);
-                const insight = quickInsight(c);
-                return (
-                  <motion.button
-                    key={c.id}
-                    initial={{ opacity: 0, x: -6 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ delay: i * 0.04 }}
-                    onClick={() => onSelectCandidate(c)}
-                    className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-muted/50 transition-colors text-left group"
-                  >
-                    {tab === 'top' && (
-                      <span className="text-xs font-display font-700 text-muted-foreground/30 w-4 shrink-0 text-center">{i + 1}</span>
-                    )}
-                    <ScoreCircle score={c.score} classification={c.classification} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-sm">{c.name}</span>
-                        {c.urgency === 'immediate' && (
-                          <span className="text-[10px] font-semibold text-emerald-500 flex items-center gap-0.5">
-                            <Timer className="w-3 h-3" />Urgente
-                          </span>
+            {displayed.length === 0 ? (
+              <p className="text-sm text-center text-muted-foreground py-6">Nenhum lead nesta categoria.</p>
+            ) : (
+              <div className="space-y-1">
+                <AnimatePresence>
+                  {displayed.map((c, i) => {
+                    const prop = properties.find(p => p.id === c.propertyId);
+                    const insight = quickInsight(c);
+                    return (
+                      <motion.div
+                        key={c.id}
+                        initial={{ opacity: 0, x: -6 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ delay: i * 0.04 }}
+                        onClick={() => onSelectCandidate(c)}
+                        className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-muted/50 transition-colors text-left group cursor-pointer"
+                      >
+                        {tab === 'top' && (
+                          <span className="text-xs font-display font-700 text-muted-foreground/30 w-4 shrink-0 text-center">{i + 1}</span>
                         )}
-                      </div>
-                      <p className="text-xs text-muted-foreground truncate mt-0.5">{insight}</p>
-                    </div>
-                    {prop && (
-                      <span className="text-[10px] text-muted-foreground/50 hidden sm:block shrink-0 max-w-[120px] truncate">{prop.title}</span>
-                    )}
-                    <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors shrink-0" />
-                  </motion.button>
-                );
-              })}
-            </AnimatePresence>
-          </div>
-        )}
+                        <ScoreCircle score={c.score} classification={c.classification} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-sm">{c.name}</span>
+                            {c.status === 'approved' && (
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 border border-emerald-200 flex items-center gap-1">
+                                <CheckCircle className="w-3 h-3" />Aprovado
+                              </span>
+                            )}
+                            {c.status === 'visit_scheduled' && (
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 border border-blue-200 flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />Visita marcada
+                              </span>
+                            )}
+                            {c.urgency === 'immediate' && c.status !== 'visit_scheduled' && (
+                              <span className="text-[10px] font-semibold text-emerald-500 flex items-center gap-0.5">
+                                <Timer className="w-3 h-3" />Urgente
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate mt-0.5">{insight}</p>
+                        </div>
+                        {prop && (
+                          <span className="text-[10px] text-muted-foreground/50 hidden sm:block shrink-0 max-w-[120px] truncate">{prop.title}</span>
+                        )}
+
+                        {/* Quick actions */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {c.status === 'new' && (
+                            <>
+                              <button
+                                onClick={e => { e.stopPropagation(); onApprove(c.id); }}
+                                className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200 transition-all"
+                              >
+                                <CheckCircle className="w-3.5 h-3.5" /> Aprovar
+                              </button>
+                              <button
+                                onClick={e => { e.stopPropagation(); onReject(c.id); }}
+                                className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 border border-red-200 transition-all"
+                              >
+                                <XCircle className="w-3.5 h-3.5" /> Rejeitar
+                              </button>
+                            </>
+                          )}
+                          {c.status === 'approved' && (
+                            <button
+                              onClick={e => { e.stopPropagation(); onSchedule(c); }}
+                              className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                            >
+                              <CalendarCheck className="w-3 h-3" /> Agendar
+                            </button>
+                          )}
+                          {c.status === 'visit_cancelled' && (
+                            <button
+                              onClick={e => { e.stopPropagation(); onReschedule(c); }}
+                              className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200 transition-colors"
+                            >
+                              <RotateCcw className="w-3 h-3" /> Reagendar
+                            </button>
+                          )}
+                          {c.status === 'visit_scheduled' && (
+                            <button
+                              onClick={e => { e.stopPropagation(); onComplete(c); }}
+                              className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200 transition-colors"
+                            >
+                              <CheckCircle className="w-3.5 h-3.5" /> Finalizar
+                            </button>
+                          )}
+                          {c.status === 'visit_finished' && (
+                            <button
+                              onClick={e => { e.stopPropagation(); onContract(c); }}
+                              className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-violet-50 text-violet-600 hover:bg-violet-100 border border-violet-200 transition-colors"
+                            >
+                              <Trophy className="w-3.5 h-3.5" /> Fechar Contrato
+                            </button>
+                          )}
+                          {c.status === 'contracted' && (
+                            <button
+                              onClick={e => { e.stopPropagation(); onRevertContract(c); }}
+                              className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200 transition-colors"
+                            >
+                              <RotateCcw className="w-3 h-3" /> Reverter
+                            </button>
+                          )}
+                          <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors shrink-0" />
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+              </div>
+            )}
       </div>
     </motion.div>
   );
@@ -218,10 +314,24 @@ function LeadCard({
   candidate,
   property,
   onClick,
+  onApprove,
+  onReject,
+  onSchedule,
+  onReschedule,
+  onComplete,
+  onContract,
+  onRevertContract,
 }: {
   candidate: Candidate;
   property: Property | undefined;
   onClick: () => void;
+  onApprove?: () => void;
+  onReject?: () => void;
+  onSchedule?: () => void;
+  onReschedule?: () => void;
+  onComplete?: () => void;
+  onContract?: () => void;
+  onRevertContract?: () => void;
 }) {
   const priority = getPriorityConfig(candidate);
   const sc = statusConfig[candidate.status];
@@ -247,7 +357,7 @@ function LeadCard({
             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${priority.dot}`} />
             {priority.label}
           </span>
-          {candidate.urgency === 'immediate' && (
+          {candidate.urgency === 'immediate' && candidate.status === 'new' && (
             <span className="text-[10px] font-semibold text-emerald-500 flex items-center gap-0.5">
               <Timer className="w-3 h-3" />Agora
             </span>
@@ -267,10 +377,82 @@ function LeadCard({
         </div>
       </div>
 
-      <div className="flex items-center gap-3 shrink-0">
+      <div className="flex items-center gap-2 shrink-0">
+        {/* Status badge */}
         <span className={`hidden sm:flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded-lg ${sc.className}`}>
           <StatusIcon className="w-3 h-3" />{sc.label}
         </span>
+
+        {/* Quick actions — novos: aprovar / rejeitar */}
+        {candidate.status === 'new' && onApprove && onReject && (
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={e => { e.stopPropagation(); onApprove(); }}
+              className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200 transition-colors"
+            >
+              <CheckCircle className="w-3.5 h-3.5" /> Aprovar
+            </button>
+            <button
+              onClick={e => { e.stopPropagation(); onReject(); }}
+              className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 border border-red-200 transition-colors"
+            >
+              <XCircle className="w-3.5 h-3.5" /> Rejeitar
+            </button>
+          </div>
+        )}
+
+        {/* Quick action — aprovados: agendar */}
+        {candidate.status === 'approved' && onSchedule && (
+          <button
+            onClick={e => { e.stopPropagation(); onSchedule(); }}
+            className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            <CalendarCheck className="w-3 h-3" /> Agendar
+          </button>
+        )}
+
+        {/* Quick action — visita cancelada: reagendar */}
+        {candidate.status === 'visit_cancelled' && onReschedule && (
+          <button
+            onClick={e => { e.stopPropagation(); onReschedule(); }}
+            className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200 transition-colors"
+          >
+            <RotateCcw className="w-3 h-3" /> Reagendar
+          </button>
+        )}
+
+        {/* Quick actions — visita marcada: finalizar */}
+        {candidate.status === 'visit_scheduled' && onComplete && (
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={e => { e.stopPropagation(); onComplete(); }}
+              className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200 transition-colors"
+            >
+              <CheckCircle className="w-3.5 h-3.5" /> Finalizar
+            </button>
+          </div>
+        )}
+
+        {/* Quick action — visita realizada: fechar contrato */}
+        {candidate.status === 'visit_finished' && onContract && (
+          <button
+            onClick={e => { e.stopPropagation(); onContract(); }}
+            className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-violet-50 text-violet-600 hover:bg-violet-100 border border-violet-200 transition-colors"
+          >
+            <Trophy className="w-3.5 h-3.5" /> Fechar Contrato
+          </button>
+        )}
+
+        {/* Quick action — contrato fechado: reverter */}
+        {candidate.status === 'contracted' && onRevertContract && (
+          <button
+            onClick={e => { e.stopPropagation(); onRevertContract(); }}
+            className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200 transition-colors"
+          >
+            <RotateCcw className="w-3 h-3" /> Reverter
+          </button>
+        )}
+
         <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
       </div>
     </motion.div>
@@ -309,6 +491,9 @@ function StatsRow({ candidates }: { candidates: Candidate[] }) {
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function Dashboard() {
+  const navigate = useNavigate();
+  const { currentAgencyId } = useAuth();
+  const { toast } = useToast();
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editingPropertyDto, setEditingPropertyDto] = useState<PropertyDto | null>(null);
@@ -357,6 +542,43 @@ export default function Dashboard() {
 
   async function handleStatusChange(id: string, status: Candidate['status']) {
     await setLeadStatus(id, status);
+  }
+
+  async function handleContract(id: string) {
+    if (!currentAgencyId) return;
+    try {
+      await contractLead(currentAgencyId, id);
+      await refreshLeads();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : null;
+      toast({
+        variant: 'destructive',
+        title: 'Imóvel já reservado',
+        description: msg ?? 'Outro lead já tem contrato fechado para este imóvel.',
+      });
+    }
+  }
+
+  async function handleRevertContract(id: string) {
+    if (!currentAgencyId) return;
+    try {
+      await revertContractLead(currentAgencyId, id);
+      await refreshLeads();
+    } catch {
+      // silently ignore
+    }
+  }
+
+  async function handleComplete(leadId: string) {
+    if (!currentAgencyId) return;
+    try {
+      const { items } = await listAppointments(currentAgencyId, { leadId, status: 'confirmed', take: 1 });
+      if (!items.length) return;
+      await updateAppointmentStatus(currentAgencyId, items[0].id, { status: 'completed' });
+      await refreshLeads();
+    } catch {
+      // silently ignore
+    }
   }
 
   function openCandidate(c: Candidate) {
@@ -619,6 +841,13 @@ export default function Dashboard() {
               allCandidates={allAgentCandidates}
               properties={filteredProperties}
               onSelectCandidate={openCandidate}
+              onApprove={id => handleStatusChange(id, 'approved')}
+              onReject={id => handleStatusChange(id, 'rejected')}
+              onSchedule={c => navigate('/appointments', { state: { preSelectLeadId: c.id } })}
+              onReschedule={c => navigate('/appointments', { state: { preSelectLeadId: c.id } })}
+              onComplete={c => handleComplete(c.id)}
+              onContract={c => handleContract(c.id)}
+              onRevertContract={c => handleRevertContract(c.id)}
             />
 
             {/* Upcoming visits */}
@@ -716,6 +945,13 @@ export default function Dashboard() {
                       candidate={c}
                       property={filteredProperties.find(p => p.id === c.propertyId)}
                       onClick={() => openCandidate(c)}
+                      onApprove={c.status === 'new' ? () => handleStatusChange(c.id, 'approved') : undefined}
+                      onReject={c.status === 'new' ? () => handleStatusChange(c.id, 'rejected') : undefined}
+                      onSchedule={c.status === 'approved' ? () => navigate('/appointments', { state: { preSelectLeadId: c.id } }) : undefined}
+                      onReschedule={c.status === 'visit_cancelled' ? () => navigate('/appointments', { state: { preSelectLeadId: c.id } }) : undefined}
+                      onComplete={c.status === 'visit_scheduled' ? () => handleComplete(c.id) : undefined}
+                      onContract={c.status === 'visit_finished' ? () => handleContract(c.id) : undefined}
+                      onRevertContract={c.status === 'contracted' ? () => handleRevertContract(c.id) : undefined}
                     />
                   ))}
                 </AnimatePresence>
@@ -726,7 +962,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      <AddPropertyDialog open={addOpen} onOpenChange={setAddOpen} />
+      <AddPropertyDialog open={addOpen} onOpenChange={setAddOpen} onCreated={refreshProperties} />
 
       {editOpen && editingPropertyDto && (
         <EditPropertyDialog

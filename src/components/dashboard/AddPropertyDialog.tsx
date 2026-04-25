@@ -19,12 +19,13 @@ import { useToast } from '@/hooks/use-toast';
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCreated?: () => void;
 }
 
 type Step = 'info' | 'criteria' | 'agents' | 'done';
 
 
-const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
+const AddPropertyDialog = ({ open, onOpenChange, onCreated }: Props) => {
   const { agents } = useAgents();
   const { create } = useProperties();
   const { toast } = useToast();
@@ -85,6 +86,7 @@ const AddPropertyDialog = ({ open, onOpenChange }: Props) => {
         },
       });
       setStep('done');
+      onCreated?.();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro ao criar imóvel.';
       toast({ title: 'Erro', description: msg, variant: 'destructive' });

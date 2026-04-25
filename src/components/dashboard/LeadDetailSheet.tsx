@@ -1,15 +1,19 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   Phone, Mail, Calendar, Users, PawPrint, Briefcase, Clock,
-  TrendingUp, Timer, Target, CheckCircle2, XCircle, CalendarCheck, ScanSearch,
+  TrendingUp, Timer, Target, CheckCircle2, XCircle, CalendarCheck, ScanSearch, Send, Loader2,
 } from 'lucide-react';
 import { Candidate, Property } from '@/lib/types';
 import { motion } from 'framer-motion';
 import type { ScoringConfigDto } from '@/lib/leads-api';
+import { sendVisitLink } from '@/lib/leads-api';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 import LeadXRayDialog from './LeadXRayDialog';
 
 interface LeadDetailSheetProps {
@@ -85,6 +89,10 @@ function ScoreRing({ score, classification }: { score: number; classification: C
 
 export default function LeadDetailSheet({ candidate, property, scoringConfig, open, onClose, onStatusChange }: LeadDetailSheetProps) {
   const [xRayOpen, setXRayOpen] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const navigate = useNavigate();
+  const { currentAgencyId } = useAuth();
+  const { toast } = useToast();
   if (!candidate || !property) return null;
 
   const rentalPrice = property.rentalPrice ?? property.price ?? 0;
@@ -142,17 +150,29 @@ export default function LeadDetailSheet({ candidate, property, scoringConfig, op
               <h2 className="font-display text-xl font-700 tracking-tight leading-tight">{candidate.name}</h2>
               <p className="text-sm text-muted-foreground mt-0.5">{property.title}</p>
               <div className="flex items-center gap-2 mt-3 flex-wrap">
-                <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-md border flex items-center gap-1.5 border-border/60 bg-card`}>
+                <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-md border flex items-center gap-1.5 ${
+                    candidate.status === 'visit_scheduled'
+                      ? 'border-blue-200 bg-blue-50 text-blue-600'
+                      : candidate.status === 'approved'
+                      ? 'border-emerald-200 bg-emerald-500/10 text-emerald-600'
+                      : 'border-border/60 bg-card'
+                  }`}>
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                    candidate.status === 'visit_scheduled' ? 'bg-blue-500' :
+                    candidate.status === 'approved' ? 'bg-emerald-500' :
                     candidate.classification === 'excellent' ? 'bg-emerald-500' :
                     candidate.classification === 'potential' ? 'bg-amber-400' : 'bg-muted-foreground/40'
                   }`} />
-                  {candidate.classification === 'excellent' ? 'Contactar agora' :
+                  {candidate.status === 'visit_scheduled' ? 'Visita marcada' :
+                   candidate.status === 'approved' ? 'Aprovado' :
+                   candidate.classification === 'excellent' ? 'Contactar agora' :
                    candidate.classification === 'potential' ? 'Avaliar' : 'Desprioritizar'}
                 </span>
-                <span className={`text-xs font-medium ${urgency.color}`}>
-                  <Timer className="w-3 h-3 inline mr-0.5" />{urgency.label}
-                </span>
+                {candidate.status !== 'approved' && candidate.status !== 'visit_scheduled' && (
+                  <span className={`text-xs font-medium ${urgency.color}`}>
+                    <Timer className="w-3 h-3 inline mr-0.5" />{urgency.label}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -245,10 +265,31 @@ export default function LeadDetailSheet({ candidate, property, scoringConfig, op
             </>
           )}
           {candidate.status === 'approved' && (
-            <Button className="w-full h-11 font-semibold rounded-xl"
-              onClick={() => { onStatusChange(candidate.id, 'visit_scheduled'); onClose(); }}>
-              <Calendar className="w-4 h-4 mr-2" /> Agendar visita
-            </Button>
+            <>
+              <Button className="w-full h-11 font-semibold rounded-xl"
+                onClick={() => { onClose(); navigate('/appointments', { state: { preSelectLeadId: candidate.id } }); }}>
+                <CalendarCheck className="w-4 h-4 mr-2" /> Agendar visita
+              </Button>
+              <Button variant="outline" className="w-full h-11 rounded-xl"
+                disabled={sendingEmail || !candidate.visitToken}
+                onClick={async () => {
+                  if (!currentAgencyId) return;
+                  setSendingEmail(true);
+                  try {
+                    await sendVisitLink(currentAgencyId, candidate.id);
+                    toast({ title: 'Email enviado!', description: `Link de visita enviado para ${candidate.email}.` });
+                  } catch {
+                    toast({ title: 'Erro ao enviar email', variant: 'destructive' });
+                  } finally {
+                    setSendingEmail(false);
+                  }
+                }}>
+                {sendingEmail
+                  ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  : <Send className="w-4 h-4 mr-2" />}
+                Enviar link de visita
+              </Button>
+            </>
           )}
           {(candidate.status === 'visit_scheduled') && candidate.scheduledVisit && (
             <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">

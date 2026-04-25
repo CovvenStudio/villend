@@ -23,6 +23,8 @@ import AgencySelect from "./pages/AgencySelect.tsx";
 import CheckoutReturn from "./pages/CheckoutReturn.tsx";
 import AcceptInvite from "./pages/AcceptInvite.tsx";
 import ScoringConfig from './pages/ScoringConfig';
+import AgencySettings from './pages/AgencySettings';
+import VisitSlotPicker from './pages/VisitSlotPicker';
 
 const queryClient = new QueryClient();
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
@@ -41,7 +43,7 @@ const App = () => (
               <Route path="/p/:slug" element={<PropertyPage />} />
               <Route path="/property/:id" element={<PropertyPublic />} />
               <Route path="/announcement/:id" element={<AnnouncementPublic />} />
-              <Route path="/visit/:candidateId" element={<VisitBooking />} />
+              <Route path="/visit/:candidateId" element={<VisitSlotPicker />} />
               <Route path="/select-agency" element={<ProtectedRoute><AgencySelect /></ProtectedRoute>} />
               <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
               <Route path="/checkout/success" element={<ProtectedRoute><CheckoutReturn /></ProtectedRoute>} />
@@ -51,6 +53,7 @@ const App = () => (
               <Route path="/appointments" element={<ProtectedRoute><SubscriptionGuard><Appointments /></SubscriptionGuard></ProtectedRoute>} />
               <Route path="/screening" element={<ProtectedRoute><SubscriptionGuard><LeadFormSettings /></SubscriptionGuard></ProtectedRoute>} />
               <Route path="/scoring" element={<ProtectedRoute><SubscriptionGuard><ScoringConfig /></SubscriptionGuard></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute><SubscriptionGuard><AgencySettings /></SubscriptionGuard></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

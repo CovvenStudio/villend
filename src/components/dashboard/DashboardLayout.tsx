@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { Building2, Calendar, UserCog, LogOut, Menu, ChevronsUpDown, ClipboardList, SlidersHorizontal } from 'lucide-react';
+import { Building2, Calendar, UserCog, LogOut, Menu, ChevronsUpDown, ClipboardList, SlidersHorizontal, Settings2 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -15,11 +15,13 @@ const navItems = [
 
 const managerNavItems = [
   { to: '/scoring', icon: SlidersHorizontal, label: 'Qualificação' },
+  { to: '/settings', icon: Settings2, label: 'Configurações' },
 ];
 
 function NavContent({ onNav }: { onNav?: () => void }) {
   const navigate = useNavigate();
   const { user, memberships, currentAgencyId, signOut } = useAuth();
+  const [avatarError, setAvatarError] = useState(false);
 
   const currentAgency = memberships.find((m) => m.agencyId === currentAgencyId) ?? null;
   const hasMultipleAgencies = memberships.length > 1;
@@ -88,21 +90,18 @@ function NavContent({ onNav }: { onNav?: () => void }) {
       <div className="p-4 border-t space-y-3">
         {user && (
           <div className="flex items-center gap-3 px-1">
-            {user.avatarUrl ? (
+            {user.avatarUrl && !avatarError ? (
               <img
                 src={user.avatarUrl}
                 alt={user.name}
                 referrerPolicy="no-referrer"
                 className="w-9 h-9 rounded-full object-cover ring-2 ring-[#1a2341] ring-offset-1"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                  (e.currentTarget.nextElementSibling as HTMLElement | null)?.style.setProperty('display', 'flex');
-                }}
+                onError={() => setAvatarError(true)}
               />
             ) : null}
             <div
               className="w-9 h-9 rounded-full bg-[#1a2341]/10 items-center justify-center text-sm font-semibold text-[#1a2341] ring-2 ring-[#1a2341] ring-offset-1"
-              style={{ display: user.avatarUrl ? 'none' : 'flex' }}
+              style={{ display: user.avatarUrl && !avatarError ? 'none' : 'flex' }}
             >
               {user.name.charAt(0).toUpperCase()}
             </div>
