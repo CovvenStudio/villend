@@ -1,11 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Calendar, CheckCircle, XCircle, Clock, Eye, Filter,
-  Flame, BanIcon, ChevronRight, Users, TrendingUp,
+  Flame, BanIcon, ChevronRight, ChevronDown, Users, TrendingUp,
   Timer,
-  ArrowUpRight, CalendarCheck, MoreHorizontal, Pencil, PauseCircle, PlayCircle, Archive, KeyRound, RotateCcw, Trophy,
+  ArrowUpRight, CalendarCheck, MoreHorizontal, Pencil, PauseCircle, PlayCircle, Archive, KeyRound, RotateCcw, Trophy, Home,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,30 @@ import AddPropertyDialog from '@/components/dashboard/AddPropertyDialog';
 import EditPropertyDialog from '@/components/dashboard/EditPropertyDialog';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import LeadDetailSheet from '@/components/dashboard/LeadDetailSheet';
+import dashboardImage1 from '@/assets/dashboard/img1.jpg';
+import dashboardImage2 from '@/assets/dashboard/img2.jpg';
+import dashboardImage3 from '@/assets/dashboard/img3.jpg';
+import dashboardImage4 from '@/assets/dashboard/img4.jpg';
+import dashboardImage5 from '@/assets/dashboard/img5.jpg';
+
+const DASHBOARD_IMAGES = [dashboardImage1, dashboardImage2, dashboardImage3, dashboardImage4, dashboardImage5];
+
+function getDashboardImageIndexForPageLoad() {
+  if (typeof window === 'undefined') return 0;
+
+  try {
+    const stored = window.localStorage.getItem('vyllad-dashboard-image-index');
+    const previousIndex = stored ? Number.parseInt(stored, 10) : -1;
+    const nextIndex = Number.isNaN(previousIndex)
+      ? 0
+      : (previousIndex + 1) % DASHBOARD_IMAGES.length;
+
+    window.localStorage.setItem('vyllad-dashboard-image-index', String(nextIndex));
+    return nextIndex;
+  } catch {
+    return 0;
+  }
+}
 
 // Adapts PropertyDto (API) to the Property shape expected by internal components
 function toProperty(dto: PropertyDto): Property {
@@ -83,17 +107,16 @@ const statusConfig: Record<Candidate['status'], { label: string; icon: typeof Cl
 };
 
 // ─── Score circle ─────────────────────────────────────────────────────────────
-function ScoreCircle({ score, classification }: { score: number; classification: Candidate['classification'] }) {
-  const color =
-    classification === 'excellent' ? 'text-foreground' :
-    classification === 'potential' ? 'text-foreground' : 'text-muted-foreground';
+function ScoreCircle({ score, classification, glass = false }: { score: number; classification: Candidate['classification']; glass?: boolean }) {
+  const s =
+    classification === 'excellent'
+      ? { bg: glass ? 'bg-emerald-400/20 ring-emerald-300/30' : 'bg-emerald-50 ring-emerald-200', text: glass ? 'text-emerald-200' : 'text-emerald-700' }
+      : classification === 'potential'
+      ? { bg: glass ? 'bg-amber-400/20 ring-amber-300/30' : 'bg-amber-50 ring-amber-200', text: glass ? 'text-amber-200' : 'text-amber-700' }
+      : { bg: glass ? 'bg-white/10 ring-white/20' : 'bg-slate-100 ring-slate-200', text: glass ? 'text-white/70' : 'text-slate-500' };
   return (
-    <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 bg-muted/60 relative">
-      <span className={`font-display font-700 text-base leading-none ${color}`}>{score}</span>
-      <span className={`absolute bottom-1.5 left-1/2 -translate-x-1/2 w-3.5 h-0.5 rounded-full ${
-        classification === 'excellent' ? 'bg-emerald-500' :
-        classification === 'potential' ? 'bg-amber-400' : 'bg-muted-foreground/30'
-      }`} />
+    <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ring-1 ${s.bg}`}>
+      <span className={`font-display font-700 text-sm leading-none ${s.text}`}>{score}</span>
     </div>
   );
 }
@@ -460,31 +483,83 @@ function LeadCard({
 }
 
 // ─── Stats Row ────────────────────────────────────────────────────────────────
-function StatsRow({ candidates }: { candidates: Candidate[] }) {
+function StatsRow({ candidates, glass = false }: { candidates: Candidate[]; glass?: boolean }) {
   const total = candidates.length;
   const excellent = candidates.filter(c => c.classification === 'excellent').length;
   const visitsScheduled = candidates.filter(c => c.status === 'visit_scheduled').length;
   const avgScore = total > 0 ? Math.round(candidates.reduce((s, c) => s + c.score, 0) / total) : 0;
 
+  const stats = [
+    { label: 'Candidatos', value: total, icon: Users, sub: 'total', accent: null },
+    { label: 'Alta prioridade', value: excellent, icon: ArrowUpRight, sub: 'para contactar', accent: excellent > 0 ? 'emerald' : null },
+    { label: 'Visitas marcadas', value: visitsScheduled, icon: CalendarCheck, sub: 'confirmadas', accent: visitsScheduled > 0 ? 'blue' : null },
+    { label: 'Score médio', value: avgScore, icon: TrendingUp, sub: 'dos candidatos', accent: avgScore >= 70 ? 'amber' : null },
+  ];
+
+  const accentText: Record<string, string> = { emerald: 'text-emerald-400', blue: 'text-blue-400', amber: 'text-amber-400' };
+  const accentIcon: Record<string, string> = { emerald: 'text-emerald-300', blue: 'text-blue-300', amber: 'text-amber-300' };
+
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-      {[
-        { label: 'Candidatos', value: total, icon: Users, sub: 'total' },
-        { label: 'Alta prioridade', value: excellent, icon: ArrowUpRight, sub: 'para contactar', highlight: excellent > 0 },
-        { label: 'Visitas marcadas', value: visitsScheduled, icon: CalendarCheck, sub: 'confirmadas' },
-        { label: 'Score médio', value: avgScore, icon: TrendingUp, sub: 'dos candidatos' },
-      ].map(({ label, value, icon: Icon, sub, highlight }) => (
-        <div key={label} className={`rounded-2xl border p-4 bg-card ${highlight ? 'border-emerald-500/20' : ''}`}>
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {stats.map(({ label, value, icon: Icon, sub, accent }) => (
+        <div key={label} className={glass
+          ? 'rounded-2xl p-4 backdrop-blur-md bg-white/10 ring-1 ring-white/20'
+          : `rounded-2xl border p-4 bg-card ${accent === 'emerald' ? 'border-emerald-500/20' : ''}`
+        }>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-muted-foreground">{label}</span>
-            <Icon className={`w-4 h-4 ${highlight ? 'text-emerald-500' : 'text-muted-foreground/40'}`} />
+            <span className={`text-xs font-medium ${glass ? 'text-white/60' : 'text-muted-foreground'}`}>{label}</span>
+            <Icon className={`w-4 h-4 ${glass ? (accent ? accentIcon[accent] : 'text-white/30') : (accent ? 'text-emerald-500' : 'text-muted-foreground/40')}`} />
           </div>
-          <div className={`font-display text-2xl font-700 tracking-tight ${highlight ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+          <div className={`font-display text-2xl font-700 tracking-tight ${glass ? (accent ? accentText[accent] : 'text-white') : (accent === 'emerald' ? 'text-emerald-600 dark:text-emerald-400' : '')}`}>
             {value}
           </div>
-          <p className="text-[11px] text-muted-foreground/60 mt-0.5">{sub}</p>
+          <p className={`text-[11px] mt-0.5 ${glass ? 'text-white/40' : 'text-muted-foreground/60'}`}>{sub}</p>
         </div>
       ))}
+    </div>
+  );
+}
+
+function DashboardSplash() {
+  return (
+    <div className="relative min-h-screen overflow-hidden bg-[#0f1115]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.16),transparent_36%),linear-gradient(135deg,#151922_0%,#0f1115_55%,#0b0d11_100%)]" />
+      <div className="absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] [background-size:40px_40px]" />
+      <div className="relative z-10 flex min-h-screen items-center justify-center px-6">
+        <motion.div
+          initial={{ opacity: 0, y: 12, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+          className="flex flex-col items-center"
+        >
+          <div className="relative flex h-40 w-40 items-center justify-center">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 2.6, repeat: Infinity, ease: 'linear' }}
+              className="absolute inset-0"
+            >
+              <div className="absolute left-1/2 top-0 h-3.5 w-3.5 -translate-x-1/2 rounded-full bg-[#d4a24c] shadow-[0_0_18px_rgba(212,162,76,0.7)]" />
+            </motion.div>
+            <div className="absolute inset-4 rounded-full border border-white/10" />
+            <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(212,162,76,0.12),transparent_62%)]" />
+            <div className="relative text-center">
+              <div className="font-display text-4xl font-700 tracking-tight text-white">
+                vyllad
+                <span className="text-[#d4a24c]">.</span>
+              </div>
+            </div>
+          </div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.15, duration: 0.4 }}
+            className="mt-6 text-center"
+          >
+            <p className="text-white text-sm font-semibold tracking-[0.24em] uppercase">A preparar dashboard</p>
+            <p className="mt-2 text-sm text-white/55">A carregar imagem, imóveis e candidatos.</p>
+          </motion.div>
+        </motion.div>
+      </div>
     </div>
   );
 }
@@ -516,7 +591,12 @@ export default function Dashboard() {
   const selectedPropertyDto = propertyDtos.find(p => p.id === effectiveSelected) ?? null;
   const property = filteredProperties.find(p => p.id === effectiveSelected) ?? null;
 
-  const { candidates, scoringConfig, setStatus: setLeadStatus, refresh: refreshLeads } = useLeads(effectiveSelected);
+  const { candidates, scoringConfig, loading: leadsLoading, setStatus: setLeadStatus, refresh: refreshLeads } = useLeads(effectiveSelected);
+  const [backgroundReady, setBackgroundReady] = useState(false);
+  const [hasBootstrapped, setHasBootstrapped] = useState(false);
+  const [isSwitchingProperty, setIsSwitchingProperty] = useState(false);
+  const [dashboardImageIndex] = useState(getDashboardImageIndexForPageLoad);
+  const transitionStartedAtRef = useRef<number>(Date.now());
 
   const propertyCandidates = useMemo(() => {
     return candidates
@@ -586,380 +666,442 @@ export default function Dashboard() {
     setSheetOpen(true);
   }
 
+  function handleSelectProperty(nextPropertyId: string | null) {
+    if (nextPropertyId === effectiveSelected) return;
+
+    transitionStartedAtRef.current = Date.now();
+    setIsSwitchingProperty(true);
+    setSelectedProperty(nextPropertyId);
+  }
+
   const propertyAgents = realAgents.filter(a => property?.agentIds.includes(a.id));
   const propertyAppointments = mockAppointments.filter(a => a.propertyId === effectiveSelected);
+  const backgroundImageSrc = DASHBOARD_IMAGES[dashboardImageIndex];
+  const isDataReady = !propertiesLoading && (!effectiveSelected || !leadsLoading) && backgroundReady;
+  const showInitialSplash = !hasBootstrapped;
+
+  useEffect(() => {
+    setBackgroundReady(false);
+
+    const image = new Image();
+    image.src = backgroundImageSrc;
+
+    const markReady = () => setBackgroundReady(true);
+
+    if (image.complete) {
+      markReady();
+      return;
+    }
+
+    image.onload = markReady;
+    image.onerror = markReady;
+
+    return () => {
+      image.onload = null;
+      image.onerror = null;
+    };
+  }, [backgroundImageSrc]);
+
+  useEffect(() => {
+    if (!hasBootstrapped && isDataReady) {
+      setHasBootstrapped(true);
+    }
+  }, [hasBootstrapped, isDataReady]);
+
+  useEffect(() => {
+    if (!isSwitchingProperty || !isDataReady) return;
+
+    const elapsed = Date.now() - transitionStartedAtRef.current;
+    const minimumVisibleMs = 260;
+    const remaining = Math.max(0, minimumVisibleMs - elapsed);
+
+    const timeoutId = window.setTimeout(() => {
+      setIsSwitchingProperty(false);
+    }, remaining);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isDataReady, isSwitchingProperty]);
 
   return (
     <DashboardLayout>
-      <div className="p-6 md:p-8 max-w-6xl mx-auto">
-
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-start justify-between mb-8 gap-4"
-        >
-          <div>
-            <h1 className="font-display text-2xl md:text-3xl font-700 tracking-tight">
-              Quem contactar agora
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Leads classificados por prioridade de conversão
-            </p>
-          </div>
-          <Button
-            onClick={() => setAddOpen(true)}
-            size="sm"
-            className="shrink-0 gap-2 rounded-xl font-semibold"
+      <AnimatePresence mode="wait">
+        {showInitialSplash ? (
+          <motion.div
+            key="dashboard-splash"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.28, ease: 'easeOut' }}
           >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Novo imóvel</span>
-          </Button>
-        </motion.div>
-
-        {propertyDtos.length === 0 ? (
-          <div className="rounded-2xl border bg-card p-16 text-center text-muted-foreground">
-            <p className="text-sm">Nenhum imóvel atribuído a este agente.</p>
-          </div>
+            <DashboardSplash />
+          </motion.div>
         ) : (
-          <>
-            {/* Property filter toggle */}
-            <div className="flex items-center gap-2 mb-4">
-              <button
-                onClick={() => { setPropertyStatusFilter('active'); setSelectedProperty(null); }}
-                className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${
-                  propertyStatusFilter === 'active'
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'border-border text-muted-foreground hover:border-foreground/40'
-                }`}
-              >
-                Ativos
-              </button>
-              <button
-                onClick={() => { setPropertyStatusFilter('closed'); setSelectedProperty(null); }}
-                className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${
-                  propertyStatusFilter === 'closed'
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'border-border text-muted-foreground hover:border-foreground/40'
-                }`}
-              >
-                Encerrados
-              </button>
-            </div>
+          <motion.div
+            key="dashboard-content"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.36, ease: [0.16, 1, 0.3, 1] }}
+          >
+            {/* ── Relative wrapper so background stays within content ──────────── */}
+            <div className="relative min-h-screen">
 
-            {filteredProperties.length === 0 ? (
-              <div className="rounded-2xl border bg-card p-12 text-center text-muted-foreground">
-                <p className="text-sm">Nenhum imóvel encerrado.</p>
-              </div>
-            ) : (<>
-            {/* Property tabs */}
-            <div className="flex gap-2.5 mb-8 overflow-x-auto pb-1 -mx-1 px-1">
-              {filteredProperties.map((p) => {
-                const dto = propertyDtos.find(d => d.id === p.id);
-                return (
-                  <div
-                    key={p.id}
-                    className={`relative flex items-center gap-3 px-4 py-3 rounded-xl border text-left shrink-0 transition-all duration-200 cursor-pointer group ${
-                      effectiveSelected === p.id
-                        ? 'border-primary/30 bg-card shadow-sm'
-                        : 'border-transparent hover:border-border hover:bg-card/50'
-                    }`}
-                    onClick={() => setSelectedProperty(p.id)}
+              {/* ── Background image (absolute, scrolls with content) ─────────── */}
+              <div className="absolute inset-0 -z-10 overflow-hidden">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={effectiveSelected ?? 'no-property'}
+                    initial={{ opacity: 0, scale: 1.06 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+                    className="absolute inset-0"
                   >
-                    {p.images && p.images.length > 0 ? (
-                      <img src={p.images[0]} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-base shrink-0">🏠</div>
-                    )}
-                    <div className="min-w-0 pr-5">
-                      <div className="flex items-center gap-1.5">
-                        <div className="text-sm font-semibold truncate max-w-[140px]">{p.title}</div>
-                        {dto?.status === 'PAUSED' && (
-                          <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200 shrink-0">
-                            Pausado
-                          </span>
-                        )}
-                        {dto?.status === 'RENTED' && (
-                          <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200 shrink-0">
-                            Arrendado
-                          </span>
-                        )}
-                        {dto?.status === 'ARCHIVED' && (
-                          <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground border shrink-0">
-                            Retirado
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {(p.rentalPrice ?? p.price) ? `€${(p.rentalPrice ?? p.price)?.toLocaleString('pt-PT')}/mês` : p.referenceId ?? ''}
+                    <img
+                      src={backgroundImageSrc}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover object-center scale-110 blur-2xl opacity-45"
+                    />
+                    <img
+                      src={backgroundImageSrc}
+                      alt=""
+                      className="w-full h-full object-cover object-center scale-[1.02] opacity-90"
+                    />
+                  </motion.div>
+                </AnimatePresence>
+                <div className="absolute inset-0 bg-black/55" />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/42 via-black/18 to-black/52" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_18%,rgba(0,0,0,0.18)_60%,rgba(0,0,0,0.38)_100%)]" />
+              </div>
+
+              <AnimatePresence>
+                {isSwitchingProperty && (
+                  <motion.div
+                    key="property-switch-overlay"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                    className="absolute inset-0 z-20 flex items-center justify-center bg-[#0f1115]/82 backdrop-blur-sm"
+                  >
+                    <div className="relative flex h-36 w-36 items-center justify-center">
+                      <div className="absolute inset-5 rounded-full border border-white/14" />
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 2.2, repeat: Infinity, ease: 'linear' }}
+                        className="absolute inset-5"
+                      >
+                        <div className="absolute left-1/2 top-0 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#d4a24c] shadow-[0_0_18px_rgba(212,162,76,0.75)]" />
+                      </motion.div>
+                      <div className="font-display text-3xl font-700 tracking-tight text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)]">
+                        vyllad<span className="text-[#d4a24c]">.</span>
                       </div>
                     </div>
-                    {/* Card actions dropdown */}
-                    {dto && (
-                      <div
-                        className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={e => e.stopPropagation()}
-                      >
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md">
-                              <MoreHorizontal className="w-3.5 h-3.5" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-44">
-                            <DropdownMenuItem
-                              onClick={() => { setEditingPropertyDto(dto); setEditOpen(true); }}
-                              className="gap-2"
-                            >
-                              <Pencil className="w-3.5 h-3.5" /> Editar imóvel
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            {dto.status === 'ACTIVE' ? (
-                              <DropdownMenuItem
-                                onClick={() => setPropertyStatus(dto.id, 'PAUSED')}
-                                className="gap-2"
-                              >
-                                <PauseCircle className="w-3.5 h-3.5" /> Pausar
-                              </DropdownMenuItem>
-                            ) : (
-                              <DropdownMenuItem
-                                onClick={() => setPropertyStatus(dto.id, 'ACTIVE')}
-                                className="gap-2"
-                              >
-                                <PlayCircle className="w-3.5 h-3.5" /> Retomar
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuSub>
-                              <DropdownMenuSubTrigger className="gap-2 text-destructive focus:text-destructive data-[state=open]:text-destructive">
-                                <Archive className="w-3.5 h-3.5" /> Encerrar
-                              </DropdownMenuSubTrigger>
-                              <DropdownMenuSubContent className="w-44">
-                                <DropdownMenuItem
-                                  onClick={() => setPropertyStatus(dto.id, 'RENTED')}
-                                  className="gap-2"
-                                >
-                                  <KeyRound className="w-3.5 h-3.5" /> Imóvel arrendado
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => setPropertyStatus(dto.id, 'ARCHIVED')}
-                                  className="gap-2 text-destructive focus:text-destructive"
-                                >
-                                  <Archive className="w-3.5 h-3.5" /> Retirar imóvel
-                                </DropdownMenuItem>
-                              </DropdownMenuSubContent>
-                            </DropdownMenuSub>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-            {/* Agents row */}
-            {propertyAgents.length > 0 && (
-              <div className="mb-6 flex items-center gap-3 text-xs text-muted-foreground">
-                <span>Responsáveis:</span>
-                <div className="flex items-center gap-2">
-                  {propertyAgents.map(a => (
-                    <div key={a.id} className="flex items-center gap-1.5">
-                      <img src={a.avatarUrl ?? `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(a.name)}`} alt={a.name} referrerPolicy="no-referrer" className="w-6 h-6 rounded-full object-cover" />
-                      <span className="font-medium text-foreground">{a.name}</span>
-                    </div>
-                  ))}
-                </div>
-                {property && (
-                  <Link
-                    to={`/p/${property.slug}`}
-                    className="ml-auto flex items-center gap-1 text-primary hover:underline font-medium"
-                    target="_blank"
+              {/* ── All content on top of the background ────────────────────────── */}
+              <div className="min-h-screen">
+                <div className="p-6 md:p-8 max-w-5xl mx-auto">
+
+                  {/* Header */}
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-start justify-between mb-6 gap-4"
                   >
-                    Ver página pública <Eye className="w-3.5 h-3.5" />
-                  </Link>
-                )}
-                {selectedPropertyDto && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg shrink-0">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-44">
-                      <DropdownMenuItem
-                        onClick={() => { setEditingPropertyDto(selectedPropertyDto); setEditOpen(true); }}
-                        className="gap-2"
-                      >
-                        <Pencil className="w-3.5 h-3.5" /> Editar imóvel
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      {selectedPropertyDto.status === 'ACTIVE' ? (
-                        <DropdownMenuItem
-                          onClick={() => setPropertyStatus(selectedPropertyDto.id, 'PAUSED')}
-                          className="gap-2"
-                        >
-                          <PauseCircle className="w-3.5 h-3.5" /> Pausar
-                        </DropdownMenuItem>
-                      ) : (
-                        <DropdownMenuItem
-                          onClick={() => setPropertyStatus(selectedPropertyDto.id, 'ACTIVE')}
-                          className="gap-2"
-                        >
-                          <PlayCircle className="w-3.5 h-3.5" /> Retomar
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger className="gap-2 text-destructive focus:text-destructive data-[state=open]:text-destructive">
-                          <Archive className="w-3.5 h-3.5" /> Encerrar
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent className="w-44">
-                          <DropdownMenuItem
-                            onClick={() => setPropertyStatus(selectedPropertyDto.id, 'RENTED')}
-                            className="gap-2"
-                          >
-                            <KeyRound className="w-3.5 h-3.5" /> Imóvel arrendado
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => setPropertyStatus(selectedPropertyDto.id, 'ARCHIVED')}
-                            className="gap-2 text-destructive focus:text-destructive"
-                          >
-                            <Archive className="w-3.5 h-3.5" /> Retirar imóvel
-                          </DropdownMenuItem>
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </div>
-            )}
-
-            {/* Stats */}
-            <StatsRow candidates={allAgentCandidates} />
-
-            {/* Smart Insights */}
-            <SmartInsightsPanel
-              allCandidates={allAgentCandidates}
-              properties={filteredProperties}
-              onSelectCandidate={openCandidate}
-              onApprove={id => handleStatusChange(id, 'approved')}
-              onReject={id => handleStatusChange(id, 'rejected')}
-              onSchedule={c => navigate('/appointments', { state: { preSelectLeadId: c.id } })}
-              onReschedule={c => navigate('/appointments', { state: { preSelectLeadId: c.id } })}
-              onComplete={c => handleComplete(c.id)}
-              onContract={c => handleContract(c.id)}
-              onRevertContract={c => handleRevertContract(c.id)}
-            />
-
-            {/* Upcoming visits */}
-            {propertyAppointments.filter(a => a.status === 'confirmed').length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="rounded-2xl border bg-card p-5 mb-8"
-              >
-                <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground mb-3">
-                  Visitas confirmadas
-                </h3>
-                <div className="space-y-2">
-                  {propertyAppointments
-                    .filter(a => a.status === 'confirmed')
-                    .map(apt => {
-                      const cand = candidates.find(c => c.id === apt.candidateId);
-                      return (
-                        <div key={apt.id} className="flex items-center gap-3 text-sm">
-                          <CalendarCheck className="w-4 h-4 text-emerald-500 shrink-0" />
-                          <span className="font-medium">{cand?.name ?? '—'}</span>
-                          <span className="text-muted-foreground">
-                            {apt.date} às {apt.time}
-                          </span>
-                          {apt.notes && (
-                            <span className="text-xs text-muted-foreground/60 hidden sm:block truncate">{apt.notes}</span>
+                    <div>
+                      <p className="text-white/40 text-xs font-medium uppercase tracking-widest mb-1">Dashboard</p>
+                      <h1 className="font-display text-2xl md:text-3xl font-700 tracking-tight text-white leading-tight">
+                        {property?.title ?? 'Imóveis'}
+                      </h1>
+                      {(property?.rentalPrice ?? property?.price) && (
+                        <p className="text-white/50 text-sm mt-0.5">
+                          €{(property.rentalPrice ?? property.price)?.toLocaleString('pt-PT')}/mês
+                          {selectedPropertyDto?.status === 'PAUSED' && (
+                            <span className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 ring-1 ring-amber-400/30">Pausado</span>
                           )}
-                        </div>
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      onClick={() => setAddOpen(true)}
+                      size="sm"
+                      className="shrink-0 gap-2 rounded-full bg-white/15 backdrop-blur-md hover:bg-white/25 text-white border-0 ring-1 ring-white/20 font-semibold"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span className="hidden sm:inline">Novo imóvel</span>
+                    </Button>
+                  </motion.div>
+
+          {propertyDtos.length === 0 ? (
+            <div className="rounded-2xl border bg-card p-16 text-center">
+              <p className="text-sm text-muted-foreground">Nenhum imóvel atribuído a este agente.</p>
+            </div>
+          ) : (
+            <>
+              {/* Property selector bar */}
+              <div className="flex flex-wrap items-center gap-2 mb-6">
+                {/* Active/closed toggle */}
+                <div className="flex items-center gap-1 p-1 rounded-full bg-white/10 backdrop-blur-md ring-1 ring-white/15 shrink-0">
+                  <button
+                    onClick={() => { setPropertyStatusFilter('active'); handleSelectProperty(null); }}
+                    className={`text-xs font-semibold px-3 py-1 rounded-full transition-all ${
+                      propertyStatusFilter === 'active' ? 'bg-white text-black shadow' : 'text-white/70 hover:text-white'
+                    }`}
+                  >Ativos</button>
+                  <button
+                    onClick={() => { setPropertyStatusFilter('closed'); handleSelectProperty(null); }}
+                    className={`text-xs font-semibold px-3 py-1 rounded-full transition-all ${
+                      propertyStatusFilter === 'closed' ? 'bg-white text-black shadow' : 'text-white/70 hover:text-white'
+                    }`}
+                  >Encerrados</button>
+                </div>
+                {/* Property selector */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex order-3 sm:order-none basis-full sm:basis-auto items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 backdrop-blur-md ring-1 ring-white/20 text-white hover:bg-white/25 transition-all outline-none w-full sm:w-[360px] max-w-full min-w-0">
+                      {property?.images?.[0] ? (
+                        <img src={property.images[0]} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />
+                      ) : (
+                        <Home className="w-3.5 h-3.5 shrink-0 text-white/60" />
+                      )}
+                      <span className="text-xs font-semibold truncate flex-1 min-w-0 text-left">
+                        {property?.title ?? 'Selecionar imóvel'}
+                      </span>
+                      <ChevronDown className="w-3 h-3 shrink-0 text-white/60" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-[420px] max-w-[calc(100vw-2rem)] p-1.5">
+                    {filteredProperties.map(p => {
+                      const isActive = effectiveSelected === p.id;
+                      return (
+                        <DropdownMenuItem
+                          key={p.id}
+                          onClick={() => handleSelectProperty(p.id)}
+                          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer ${
+                            isActive ? 'bg-primary/10 text-primary font-semibold' : ''
+                          }`}
+                        >
+                          {p.images?.[0] ? (
+                            <img src={p.images[0]} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                              <Home className="w-4 h-4 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium leading-snug whitespace-normal break-words">{p.title}</p>
+                            {(p.rentalPrice ?? p.price) && (
+                              <p className="text-xs text-muted-foreground">€{(p.rentalPrice ?? p.price)?.toLocaleString('pt-PT')}/mês</p>
+                            )}
+                          </div>
+                          {isActive && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
+                        </DropdownMenuItem>
                       );
                     })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                {/* Property actions */}
+                <div className="flex items-center gap-2 sm:ml-auto shrink-0">
+                  {property?.slug && (
+                    <Link
+                      to={`/p/${property.slug}`}
+                      target="_blank"
+                      className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md text-white hover:bg-white/20 transition-all ring-1 ring-white/15"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Ver página</span>
+                    </Link>
+                  )}
+                  {selectedPropertyDto && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-white/10 backdrop-blur-md hover:bg-white/20 text-white ring-1 ring-white/15 border-0">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-44">
+                        <DropdownMenuItem onClick={() => { setEditingPropertyDto(selectedPropertyDto); setEditOpen(true); }} className="gap-2">
+                          <Pencil className="w-3.5 h-3.5" /> Editar imóvel
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {selectedPropertyDto.status === 'ACTIVE' ? (
+                          <DropdownMenuItem onClick={() => setPropertyStatus(selectedPropertyDto.id, 'PAUSED')} className="gap-2">
+                            <PauseCircle className="w-3.5 h-3.5" /> Pausar
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem onClick={() => setPropertyStatus(selectedPropertyDto.id, 'ACTIVE')} className="gap-2">
+                            <PlayCircle className="w-3.5 h-3.5" /> Retomar
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger className="gap-2 text-destructive focus:text-destructive data-[state=open]:text-destructive">
+                            <Archive className="w-3.5 h-3.5" /> Encerrar
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent className="w-44">
+                            <DropdownMenuItem onClick={() => setPropertyStatus(selectedPropertyDto.id, 'RENTED')} className="gap-2">
+                              <KeyRound className="w-3.5 h-3.5" /> Imóvel arrendado
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setPropertyStatus(selectedPropertyDto.id, 'ARCHIVED')} className="gap-2 text-destructive focus:text-destructive">
+                              <Archive className="w-3.5 h-3.5" /> Retirar imóvel
+                            </DropdownMenuItem>
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                  {propertyAgents.length > 0 && (
+                    <div className="flex -space-x-1">
+                      {propertyAgents.map(a => (
+                        <img
+                          key={a.id}
+                          src={a.avatarUrl ?? `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(a.name)}`}
+                          alt={a.name}
+                          title={a.name}
+                          referrerPolicy="no-referrer"
+                          className="w-7 h-7 rounded-full object-cover ring-2 ring-white/20"
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </motion.div>
-            )}
-
-            {/* Filters + Lead list */}
-            <div className="flex flex-wrap gap-2.5 mb-5 items-center">
-              <h2 className="font-display font-700 text-base flex-1">
-                Todos os candidatos
-                <span className="ml-2 text-sm font-400 text-muted-foreground font-sans">
-                  ({propertyCandidates.length})
-                </span>
-              </h2>
-              <div className="flex gap-2 flex-wrap">
-                <Select value={scoreFilter} onValueChange={setScoreFilter}>
-                  <SelectTrigger className="h-8 text-xs rounded-lg w-[130px]">
-                    <Filter className="w-3 h-3 mr-1.5" />
-                    <SelectValue placeholder="Score" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os scores</SelectItem>
-                    <SelectItem value="high">Alta prioridade (80+)</SelectItem>
-                    <SelectItem value="mid">Média (60–79)</SelectItem>
-                    <SelectItem value="low">Baixa (&lt;60)</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select value={urgencyFilter} onValueChange={setUrgencyFilter}>
-                  <SelectTrigger className="h-8 text-xs rounded-lg w-[120px]">
-                    <Timer className="w-3 h-3 mr-1.5" />
-                    <SelectValue placeholder="Urgência" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Toda urgência</SelectItem>
-                    <SelectItem value="immediate">Urgente</SelectItem>
-                    <SelectItem value="soon">Em breve</SelectItem>
-                    <SelectItem value="flexible">Flexível</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="h-8 text-xs rounded-lg w-[130px]">
-                    <SelectValue placeholder="Estado" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os estados</SelectItem>
-                    <SelectItem value="new">Novos</SelectItem>
-                    <SelectItem value="approved">Aprovados</SelectItem>
-                    <SelectItem value="visit_scheduled">Visita marcada</SelectItem>
-                    <SelectItem value="rejected">Rejeitados</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
-            </div>
 
-            {propertyCandidates.length === 0 ? (
-              <div className="rounded-2xl border bg-card p-12 text-center text-muted-foreground">
-                <p className="text-sm">Nenhum candidato encontrado com os filtros actuais.</p>
-              </div>
-            ) : (
-              <motion.div layout className="space-y-3">
-                <AnimatePresence>
-                  {propertyCandidates.map(c => (
-                    <LeadCard
-                      key={c.id}
-                      candidate={c}
-                      property={filteredProperties.find(p => p.id === c.propertyId)}
-                      onClick={() => openCandidate(c)}
-                      onApprove={c.status === 'new' ? () => handleStatusChange(c.id, 'approved') : undefined}
-                      onReject={c.status === 'new' ? () => handleStatusChange(c.id, 'rejected') : undefined}
-                      onSchedule={c.status === 'approved' ? () => navigate('/appointments', { state: { preSelectLeadId: c.id } }) : undefined}
-                      onReschedule={c.status === 'visit_cancelled' ? () => navigate('/appointments', { state: { preSelectLeadId: c.id } }) : undefined}
-                      onComplete={c.status === 'visit_scheduled' ? () => handleComplete(c.id) : undefined}
-                      onContract={c.status === 'visit_finished' ? () => handleContract(c.id) : undefined}
-                      onRevertContract={c.status === 'contracted' ? () => handleRevertContract(c.id) : undefined}
-                    />
-                  ))}
-                </AnimatePresence>
-              </motion.div>
-            )}
-            </>)}
-          </>
-        )}
+              {filteredProperties.length === 0 ? (
+                <div className="rounded-2xl border bg-card p-12 text-center">
+                  <p className="text-sm text-muted-foreground">Nenhum imóvel encerrado.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Stats row */}
+                  <div className="mb-6">
+                    <StatsRow candidates={allAgentCandidates} />
+                  </div>
+
+                  {/* Smart Insights */}
+                  <SmartInsightsPanel
+                    allCandidates={allAgentCandidates}
+                    properties={filteredProperties}
+                    onSelectCandidate={openCandidate}
+                    onApprove={id => handleStatusChange(id, 'approved')}
+                    onReject={id => handleStatusChange(id, 'rejected')}
+                    onSchedule={c => navigate('/appointments', { state: { preSelectLeadId: c.id } })}
+                    onReschedule={c => navigate('/appointments', { state: { preSelectLeadId: c.id } })}
+                    onComplete={c => handleComplete(c.id)}
+                    onContract={c => handleContract(c.id)}
+                    onRevertContract={c => handleRevertContract(c.id)}
+                  />
+
+                  {/* Upcoming visits */}
+                  {propertyAppointments.filter(a => a.status === 'confirmed').length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="rounded-2xl border bg-card p-5 mb-8"
+                    >
+                      <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground mb-3">
+                        Visitas confirmadas
+                      </h3>
+                      <div className="space-y-2">
+                        {propertyAppointments
+                          .filter(a => a.status === 'confirmed')
+                          .map(apt => {
+                            const cand = candidates.find(c => c.id === apt.candidateId);
+                            return (
+                              <div key={apt.id} className="flex items-center gap-3 text-sm">
+                                <CalendarCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                                <span className="font-medium">{cand?.name ?? '—'}</span>
+                                <span className="text-muted-foreground">{apt.date} às {apt.time}</span>
+                                {apt.notes && (
+                                  <span className="text-xs text-muted-foreground/60 hidden sm:block truncate">{apt.notes}</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* Filters + Lead list */}
+                  <div className="flex flex-wrap gap-2.5 mb-5 items-center">
+                    <h2 className="font-display font-700 text-base flex-1 text-white">
+                      Todos os candidatos
+                      <span className="ml-2 text-sm font-400 text-white/50 font-sans">
+                        ({propertyCandidates.length})
+                      </span>
+                    </h2>
+                    <div className="flex gap-2 flex-wrap">
+                      <Select value={scoreFilter} onValueChange={setScoreFilter}>
+                        <SelectTrigger className="h-8 text-xs rounded-lg w-[130px]">
+                          <Filter className="w-3 h-3 mr-1.5" />
+                          <SelectValue placeholder="Score" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos os scores</SelectItem>
+                          <SelectItem value="high">Alta prioridade (80+)</SelectItem>
+                          <SelectItem value="mid">Média (60–79)</SelectItem>
+                          <SelectItem value="low">Baixa (&lt;60)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={urgencyFilter} onValueChange={setUrgencyFilter}>
+                        <SelectTrigger className="h-8 text-xs rounded-lg w-[120px]">
+                          <Timer className="w-3 h-3 mr-1.5" />
+                          <SelectValue placeholder="Urgência" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Toda urgência</SelectItem>
+                          <SelectItem value="immediate">Urgente</SelectItem>
+                          <SelectItem value="soon">Em breve</SelectItem>
+                          <SelectItem value="flexible">Flexível</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="h-8 text-xs rounded-lg w-[130px]">
+                          <SelectValue placeholder="Estado" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos os estados</SelectItem>
+                          <SelectItem value="new">Novos</SelectItem>
+                          <SelectItem value="approved">Aprovados</SelectItem>
+                          <SelectItem value="visit_scheduled">Visita marcada</SelectItem>
+                          <SelectItem value="rejected">Rejeitados</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {propertyCandidates.length === 0 ? (
+                    <div className="rounded-2xl border bg-card p-12 text-center">
+                      <p className="text-sm text-muted-foreground">Nenhum candidato encontrado com os filtros actuais.</p>
+                    </div>
+                  ) : (
+                    <motion.div layout className="space-y-2.5 pb-10">
+                      <AnimatePresence>
+                        {propertyCandidates.map(c => (
+                          <LeadCard
+                            key={c.id}
+                            candidate={c}
+                            property={filteredProperties.find(p => p.id === c.propertyId)}
+                            onClick={() => openCandidate(c)}
+                            onApprove={c.status === 'new' ? () => handleStatusChange(c.id, 'approved') : undefined}
+                            onReject={c.status === 'new' ? () => handleStatusChange(c.id, 'rejected') : undefined}
+                            onSchedule={c.status === 'approved' ? () => navigate('/appointments', { state: { preSelectLeadId: c.id } }) : undefined}
+                            onReschedule={c.status === 'visit_cancelled' ? () => navigate('/appointments', { state: { preSelectLeadId: c.id } }) : undefined}
+                            onComplete={c.status === 'visit_scheduled' ? () => handleComplete(c.id) : undefined}
+                            onContract={c.status === 'visit_finished' ? () => handleContract(c.id) : undefined}
+                            onRevertContract={c.status === 'contracted' ? () => handleRevertContract(c.id) : undefined}
+                          />
+                        ))}
+                      </AnimatePresence>
+                    </motion.div>
+                  )}
+                </>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       <AddPropertyDialog open={addOpen} onOpenChange={setAddOpen} onCreated={refreshProperties} />
@@ -981,8 +1123,11 @@ export default function Dashboard() {
         onClose={() => setSheetOpen(false)}
         onStatusChange={handleStatusChange}
       />
+      </div>{/* end relative wrapper */}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </DashboardLayout>
   );
 }
-
 

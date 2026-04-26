@@ -184,9 +184,9 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen flex">
       {/* Desktop sidebar */}
-      <aside className="w-60 border-r bg-card hidden lg:flex flex-col fixed h-screen">
+      <aside className="w-60 border-r bg-card hidden lg:flex flex-col fixed h-screen z-30">
         <NavContent />
       </aside>
 
@@ -208,7 +208,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
         </Sheet>
       </header>
 
-      <main className="flex-1 overflow-auto lg:ml-60 pt-14 lg:pt-0">{children}</main>
+      <main className="flex-1 lg:ml-60 pt-14 lg:pt-0 overflow-x-hidden">{children}</main>
     </div>
   );
 };
