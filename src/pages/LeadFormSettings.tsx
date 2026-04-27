@@ -23,12 +23,15 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 export default function LeadFormSettings() {
-  const { currentAgencyId } = useAuth();
+  const { currentAgencyId, memberships } = useAuth();
   const [config, setConfig] = useState<AgencyScreeningConfigDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [editQuestion, setEditQuestion] = useState<CustomScreeningQuestionDto | null>(null);
+
+  const currentMembership = memberships.find(m => m.agencyId === currentAgencyId) ?? null;
+  const isReadOnly = currentMembership?.role === 'AGENT';
 
   useEffect(() => {
     if (!currentAgencyId) return;
@@ -151,7 +154,7 @@ export default function LeadFormSettings() {
                               Sempre activo
                             </span>
                           ) : (
-                            <Switch checked={q.enabled} onCheckedChange={() => toggleSystem(q.key)} />
+                            <Switch checked={q.enabled} onCheckedChange={() => !isReadOnly && toggleSystem(q.key)} disabled={isReadOnly} />
                           )}
                         </div>
                       ))}
@@ -167,10 +170,12 @@ export default function LeadFormSettings() {
                 <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
                   Perguntas personalizadas
                 </p>
-                <Button size="sm" variant="outline" className="gap-2 rounded-xl h-8" onClick={() => setAddOpen(true)}>
-                  <Plus className="w-3.5 h-3.5" />
-                  Adicionar
-                </Button>
+                {!isReadOnly && (
+                  <Button size="sm" variant="outline" className="gap-2 rounded-xl h-8" onClick={() => setAddOpen(true)}>
+                    <Plus className="w-3.5 h-3.5" />
+                    Adicionar
+                  </Button>
+                )}
               </div>
 
               {config.customQuestions.length === 0 ? (
@@ -202,12 +207,16 @@ export default function LeadFormSettings() {
                         )}
                       </div>
                       <div className="flex items-center gap-1">
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground" onClick={() => setEditQuestion(q)}>
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive/60 hover:text-destructive" onClick={() => deleteCustom(q.id)}>
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
+                        {!isReadOnly && (
+                          <>
+                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground" onClick={() => setEditQuestion(q)}>
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive/60 hover:text-destructive" onClick={() => deleteCustom(q.id)}>
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -215,13 +224,15 @@ export default function LeadFormSettings() {
               )}
             </section>
 
-            {/* Save */}
-            <div className="flex justify-end pt-2 border-t">
-              <Button onClick={handleSave} disabled={saving} className="gap-2 rounded-xl px-6">
-                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                Guardar alterações
-              </Button>
-            </div>
+            {/* Save — hidden for agents */}
+            {!isReadOnly && (
+              <div className="flex justify-end pt-2 border-t">
+                <Button onClick={handleSave} disabled={saving} className="gap-2 rounded-xl px-6">
+                  {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Guardar alterações
+                </Button>
+              </div>
+            )}
           </div>
         ) : null}
 

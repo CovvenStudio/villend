@@ -12,11 +12,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { mockAppointments } from '@/lib/mock-data';
 import { Candidate, Property } from '@/lib/types';
 import { useLeads } from '@/hooks/useLeads';
 import { contractLead, revertContractLead } from '@/lib/leads-api';
-import { listAppointments, updateAppointmentStatus } from '@/lib/appointments-api';
+import { listAppointments, updateAppointmentStatus, type AppointmentDto } from '@/lib/appointments-api';
 import { useAuth } from '@/contexts/AuthContext';
 import { PropertyDto } from '@/lib/properties-api';
 import { useProperties } from '@/hooks/useProperties';
@@ -570,7 +569,16 @@ export default function Dashboard() {
   const property = filteredProperties.find(p => p.id === effectiveSelected) ?? null;
 
   const { candidates, scoringConfig, loading: leadsLoading, setStatus: setLeadStatus, refresh: refreshLeads } = useLeads(effectiveSelected);
+  const [propertyAppointments, setPropertyAppointments] = useState<AppointmentDto[]>([]);
   const [hasBootstrapped, setHasBootstrapped] = useState(false);
+
+  // Load confirmed appointments for the selected property
+  useEffect(() => {
+    if (!currentAgencyId || !effectiveSelected) { setPropertyAppointments([]); return; }
+    listAppointments(currentAgencyId, { propertyId: effectiveSelected, status: 'confirmed', take: 50 })
+      .then(r => setPropertyAppointments(r.items))
+      .catch(() => setPropertyAppointments([]));
+  }, [currentAgencyId, effectiveSelected]);
   const [isSwitchingProperty, setIsSwitchingProperty] = useState(false);
   const transitionStartedAtRef = useRef<number>(Date.now());
 
@@ -651,7 +659,6 @@ export default function Dashboard() {
   }
 
   const propertyAgents = realAgents.filter(a => property?.agentIds.includes(a.id));
-  const propertyAppointments = mockAppointments.filter(a => a.propertyId === effectiveSelected);
   const isDataReady = !propertiesLoading && (!effectiveSelected || !leadsLoading);
   const showInitialSplash = !hasBootstrapped;
 
@@ -931,7 +938,7 @@ export default function Dashboard() {
                         {propertyAppointments
                           .filter(a => a.status === 'confirmed')
                           .map(apt => {
-                            const cand = candidates.find(c => c.id === apt.candidateId);
+                            const cand = candidates.find(c => c.id === apt.leadId);
                             return (
                               <div key={apt.id} className="flex items-center gap-3 text-sm">
                                 <CalendarCheck className="w-4 h-4 text-emerald-500 shrink-0" />
