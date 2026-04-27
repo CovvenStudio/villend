@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import { AlertTriangle, Building2, ChevronRight, Loader2, LogOut, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFeatureFlags } from '@/contexts/FeatureFlagsContext';
+import { resolveFirstAccessibleLoggedRoute } from '@/lib/route-access';
 import { apiFetch } from '@/lib/api-client';
 
 const ROLE_LABEL: Record<string, string> = { OWNER: 'Proprietário', MANAGER: 'Gerente', AGENT: 'Colaborador' };
@@ -12,6 +14,7 @@ const BLOCKED_STATUSES = ['cancelled', 'past_due'];
 
 const AgencySelect = () => {
   const { memberships, subscription, selectAgency, signOut } = useAuth();
+  const { isEnabled } = useFeatureFlags();
   const navigate = useNavigate();
   const [renewing, setRenewing] = useState(false);
   const [renewError, setRenewError] = useState<string | null>(null);
@@ -22,8 +25,12 @@ const AgencySelect = () => {
 
   const handleSelect = (agencyId: string) => {
     if (isBlocked) return;
+    const selected = memberships.find((m) => m.agencyId === agencyId);
     selectAgency(agencyId);
-    navigate('/dashboard', { replace: true });
+    const target = selected
+      ? (resolveFirstAccessibleLoggedRoute(selected.role, { isEnabled }) ?? '/system-unavailable')
+      : '/system-unavailable';
+    navigate(target, { replace: true });
   };
 
   const handleRenew = async () => {

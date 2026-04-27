@@ -3,29 +3,31 @@ import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { Building2, Calendar, UserCog, LogOut, Menu, ChevronsUpDown, ClipboardList, SlidersHorizontal, Settings2, CreditCard, Crown, Clock, LayoutDashboard, Home } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFeatureFlags } from '@/contexts/FeatureFlagsContext';
 
 const ROLE_LABEL: Record<string, string> = { OWNER: 'Proprietário', MANAGER: 'Gerente', AGENT: 'Colaborador' };
 
 const navItems = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', end: true },
-  { to: '/properties', icon: Home, label: 'Imóveis' },
-  { to: '/agents', icon: UserCog, label: 'Agentes' },
-  { to: '/appointments', icon: Calendar, label: 'Agendamentos' },
-  { to: '/screening', icon: ClipboardList, label: 'Triagem' },
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', end: true, featureKey: 'dashboard.module_enabled' },
+  { to: '/properties', icon: Home, label: 'Imóveis', featureKey: 'properties.module_enabled' },
+  { to: '/agents', icon: UserCog, label: 'Agentes', featureKey: 'agents.management_enabled' },
+  { to: '/appointments', icon: Calendar, label: 'Agendamentos', featureKey: 'appointments.module_enabled' },
+  { to: '/screening', icon: ClipboardList, label: 'Triagem', featureKey: 'screening.module_enabled' },
 ];
 
 const managerNavItems = [
-  { to: '/scoring', icon: SlidersHorizontal, label: 'Qualificação' },
-  { to: '/settings', icon: Settings2, label: 'Configurações' },
+  { to: '/scoring', icon: SlidersHorizontal, label: 'Qualificação', featureKey: 'scoring.module_enabled' },
+  { to: '/settings', icon: Settings2, label: 'Configurações', featureKey: 'settings.module_enabled' },
 ];
 
 const ownerNavItems = [
-  { to: '/billing', icon: CreditCard, label: 'Faturação' },
+  { to: '/billing', icon: CreditCard, label: 'Faturação', featureKey: 'billing.module_enabled' },
 ];
 
 function NavContent({ onNav }: { onNav?: () => void }) {
   const navigate = useNavigate();
   const { user, memberships, currentAgencyId, subscription, signOut } = useAuth();
+  const { isEnabled } = useFeatureFlags();
   const [avatarError, setAvatarError] = useState(false);
 
   const currentAgency = memberships.find((m) => m.agencyId === currentAgencyId) ?? null;
@@ -86,7 +88,9 @@ function NavContent({ onNav }: { onNav?: () => void }) {
       )}
 
       <nav className="flex-1 p-3 space-y-0.5">
-        {[...navItems, ...(currentAgency && ['OWNER', 'MANAGER'].includes(currentAgency.role) ? managerNavItems : []), ...(currentAgency?.role === 'OWNER' ? ownerNavItems : [])].map((item) => (
+        {[...navItems, ...(currentAgency && ['OWNER', 'MANAGER'].includes(currentAgency.role) ? managerNavItems : []), ...(currentAgency?.role === 'OWNER' ? ownerNavItems : [])]
+          .filter((item) => !('featureKey' in item) || !item.featureKey || isEnabled(item.featureKey))
+          .map((item) => (
           <NavLink
             key={item.to}
             to={item.to}

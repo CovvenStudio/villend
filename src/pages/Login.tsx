@@ -5,6 +5,8 @@ import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useGoogleLogin } from '@react-oauth/google';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFeatureFlags } from '@/contexts/FeatureFlagsContext';
+import { resolveFirstAccessibleLoggedRoute } from '@/lib/route-access';
 import heroVilla from '@/assets/hero-villa.jpg';
 
 const GoogleIcon = () => (
@@ -19,6 +21,7 @@ const GoogleIcon = () => (
 const Login = () => {
   const navigate = useNavigate();
   const { signIn } = useAuth();
+  const { isEnabled } = useFeatureFlags();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,9 +32,9 @@ const Login = () => {
       const { needsOnboarding, memberships } = await signIn(tokenResponse.access_token);
       if (needsOnboarding) {
         navigate('/onboarding', { replace: true });
-      } else if (memberships.length === 1 && memberships[0].role === 'OWNER') {
-        // Single owner agency — go straight to dashboard
-        navigate('/dashboard', { replace: true });
+      } else if (memberships.length === 1) {
+        const target = resolveFirstAccessibleLoggedRoute(memberships[0].role, { isEnabled }) ?? '/system-unavailable';
+        navigate(target, { replace: true });
       } else {
         // Multiple agencies, or not an owner — show agency select
         navigate('/select-agency', { replace: true });

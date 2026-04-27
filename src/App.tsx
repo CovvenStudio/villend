@@ -17,6 +17,7 @@ import Login from "./pages/Login.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import ProtectedRoute from "./components/ProtectedRoute.tsx";
 import SubscriptionGuard from "./components/SubscriptionGuard.tsx";
+import FeatureRoute from "./components/FeatureRoute.tsx";
 import VisitBooking from "./pages/VisitBooking.tsx";
 import Onboarding from "./pages/Onboarding.tsx";
 import AgencySelect from "./pages/AgencySelect.tsx";
@@ -29,6 +30,8 @@ import Billing from './pages/Billing';
 import UpgradePlan from './pages/UpgradePlan';
 import Imoveis from './pages/Imoveis';
 import PropertyDetail from './pages/PropertyDetail';
+import SystemUnavailable from './pages/SystemUnavailable';
+import { FeatureFlagsProvider } from '@/contexts/FeatureFlagsContext';
 
 const queryClient = new QueryClient();
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
@@ -37,35 +40,38 @@ const App = () => (
   <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/p/:slug" element={<PropertyPage />} />
-              <Route path="/property/:id" element={<PropertyPublic />} />
-              <Route path="/announcement/:id" element={<AnnouncementPublic />} />
-              <Route path="/visit/:candidateId" element={<VisitSlotPicker />} />
-              <Route path="/select-agency" element={<ProtectedRoute><AgencySelect /></ProtectedRoute>} />
-              <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
-              <Route path="/checkout/success" element={<ProtectedRoute><CheckoutReturn /></ProtectedRoute>} />
-              <Route path="/invite/:token" element={<AcceptInvite />} />
-              <Route path="/dashboard" element={<ProtectedRoute><SubscriptionGuard><Dashboard /></SubscriptionGuard></ProtectedRoute>} />
-              <Route path="/properties" element={<ProtectedRoute><SubscriptionGuard><Imoveis /></SubscriptionGuard></ProtectedRoute>} />
-              <Route path="/properties/:id" element={<ProtectedRoute><SubscriptionGuard><PropertyDetail /></SubscriptionGuard></ProtectedRoute>} />
-              <Route path="/agents" element={<ProtectedRoute><SubscriptionGuard><Agents /></SubscriptionGuard></ProtectedRoute>} />
-              <Route path="/appointments" element={<ProtectedRoute><SubscriptionGuard><Appointments /></SubscriptionGuard></ProtectedRoute>} />
-              <Route path="/screening" element={<ProtectedRoute><SubscriptionGuard><LeadFormSettings /></SubscriptionGuard></ProtectedRoute>} />
-              <Route path="/scoring" element={<ProtectedRoute><SubscriptionGuard><ScoringConfig /></SubscriptionGuard></ProtectedRoute>} />
-              <Route path="/settings" element={<ProtectedRoute><SubscriptionGuard><AgencySettings /></SubscriptionGuard></ProtectedRoute>} />
-              <Route path="/billing" element={<ProtectedRoute><SubscriptionGuard><Billing /></SubscriptionGuard></ProtectedRoute>} />
-              <Route path="/onboarding/upgrade" element={<ProtectedRoute><UpgradePlan /></ProtectedRoute>} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
+        <FeatureFlagsProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/p/:slug" element={<PropertyPage />} />
+                <Route path="/property/:id" element={<PropertyPublic />} />
+                <Route path="/announcement/:id" element={<AnnouncementPublic />} />
+                <Route path="/visit/:candidateId" element={<VisitSlotPicker />} />
+                <Route path="/select-agency" element={<ProtectedRoute><AgencySelect /></ProtectedRoute>} />
+                <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
+                <Route path="/checkout/success" element={<ProtectedRoute><CheckoutReturn /></ProtectedRoute>} />
+                <Route path="/invite/:token" element={<AcceptInvite />} />
+                <Route path="/dashboard" element={<ProtectedRoute><SubscriptionGuard><FeatureRoute featureKey="dashboard.module_enabled" fallbackTo="/properties"><Dashboard /></FeatureRoute></SubscriptionGuard></ProtectedRoute>} />
+                <Route path="/properties" element={<ProtectedRoute><SubscriptionGuard><FeatureRoute featureKey="properties.module_enabled"><Imoveis /></FeatureRoute></SubscriptionGuard></ProtectedRoute>} />
+                <Route path="/properties/:id" element={<ProtectedRoute><SubscriptionGuard><FeatureRoute featureKey="properties.module_enabled"><PropertyDetail /></FeatureRoute></SubscriptionGuard></ProtectedRoute>} />
+                <Route path="/agents" element={<ProtectedRoute><SubscriptionGuard><FeatureRoute featureKey="agents.management_enabled"><Agents /></FeatureRoute></SubscriptionGuard></ProtectedRoute>} />
+                <Route path="/appointments" element={<ProtectedRoute><SubscriptionGuard><FeatureRoute featureKey="appointments.module_enabled"><Appointments /></FeatureRoute></SubscriptionGuard></ProtectedRoute>} />
+                <Route path="/screening" element={<ProtectedRoute><SubscriptionGuard><FeatureRoute featureKey="screening.module_enabled"><LeadFormSettings /></FeatureRoute></SubscriptionGuard></ProtectedRoute>} />
+                <Route path="/scoring" element={<ProtectedRoute><SubscriptionGuard><FeatureRoute featureKey="scoring.module_enabled"><ScoringConfig /></FeatureRoute></SubscriptionGuard></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute><SubscriptionGuard><FeatureRoute featureKey="settings.module_enabled"><AgencySettings /></FeatureRoute></SubscriptionGuard></ProtectedRoute>} />
+                <Route path="/billing" element={<ProtectedRoute><SubscriptionGuard><FeatureRoute featureKey="billing.module_enabled"><Billing /></FeatureRoute></SubscriptionGuard></ProtectedRoute>} />
+                <Route path="/onboarding/upgrade" element={<ProtectedRoute><UpgradePlan /></ProtectedRoute>} />
+                <Route path="/system-unavailable" element={<SystemUnavailable />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
+        </FeatureFlagsProvider>
       </AuthProvider>
     </QueryClientProvider>
   </GoogleOAuthProvider>

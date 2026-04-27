@@ -6,6 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import AddCustomQuestionDialog from '@/components/screening/AddCustomQuestionDialog';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFeatureFlags } from '@/contexts/FeatureFlagsContext';
 import {
   getAgencyScreeningConfig,
   saveAgencyScreeningConfig,
@@ -24,6 +25,7 @@ const TYPE_LABEL: Record<string, string> = {
 
 export default function LeadFormSettings() {
   const { currentAgencyId, memberships } = useAuth();
+  const { isEnabled } = useFeatureFlags();
   const [config, setConfig] = useState<AgencyScreeningConfigDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -31,7 +33,8 @@ export default function LeadFormSettings() {
   const [editQuestion, setEditQuestion] = useState<CustomScreeningQuestionDto | null>(null);
 
   const currentMembership = memberships.find(m => m.agencyId === currentAgencyId) ?? null;
-  const isReadOnly = currentMembership?.role === 'AGENT';
+  const screeningEditEnabled = isEnabled('screening.edit_enabled');
+  const isReadOnly = currentMembership?.role === 'AGENT' || !screeningEditEnabled;
 
   useEffect(() => {
     if (!currentAgencyId) return;
