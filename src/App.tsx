@@ -27,6 +27,8 @@ import AgencySettings from './pages/AgencySettings';
 import VisitSlotPicker from './pages/VisitSlotPicker';
 import Billing from './pages/Billing';
 import UpgradePlan from './pages/UpgradePlan';
+import Imoveis from './pages/Imoveis';
+import PropertyDetail from './pages/PropertyDetail';
 
 const queryClient = new QueryClient();
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
@@ -51,6 +53,8 @@ const App = () => (
               <Route path="/checkout/success" element={<ProtectedRoute><CheckoutReturn /></ProtectedRoute>} />
               <Route path="/invite/:token" element={<AcceptInvite />} />
               <Route path="/dashboard" element={<ProtectedRoute><SubscriptionGuard><Dashboard /></SubscriptionGuard></ProtectedRoute>} />
+              <Route path="/imoveis" element={<ProtectedRoute><SubscriptionGuard><Imoveis /></SubscriptionGuard></ProtectedRoute>} />
+              <Route path="/imoveis/:id" element={<ProtectedRoute><SubscriptionGuard><PropertyDetail /></SubscriptionGuard></ProtectedRoute>} />
               <Route path="/agents" element={<ProtectedRoute><SubscriptionGuard><Agents /></SubscriptionGuard></ProtectedRoute>} />
               <Route path="/appointments" element={<ProtectedRoute><SubscriptionGuard><Appointments /></SubscriptionGuard></ProtectedRoute>} />
               <Route path="/screening" element={<ProtectedRoute><SubscriptionGuard><LeadFormSettings /></SubscriptionGuard></ProtectedRoute>} />

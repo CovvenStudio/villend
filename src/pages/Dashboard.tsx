@@ -7,7 +7,7 @@ import {
   Timer,
   ArrowUpRight, CalendarCheck, MoreHorizontal, Pencil, PauseCircle, PlayCircle, Archive, KeyRound, RotateCcw, Trophy, Home,
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -569,10 +569,13 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { currentAgencyId } = useAuth();
   const { toast } = useToast();
+  const location = useLocation();
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editingPropertyDto, setEditingPropertyDto] = useState<PropertyDto | null>(null);
-  const [selectedProperty, setSelectedProperty] = useState<string | null>(null);
+  const [selectedProperty, setSelectedProperty] = useState<string | null>(
+    (location.state as { propertyId?: string } | null)?.propertyId ?? null
+  );
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [scoreFilter, setScoreFilter] = useState<string>('all');

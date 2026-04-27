@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { Building2, Calendar, UserCog, LogOut, Menu, ChevronsUpDown, ClipboardList, SlidersHorizontal, Settings2, CreditCard, Crown, Clock } from 'lucide-react';
+import { Building2, Calendar, UserCog, LogOut, Menu, ChevronsUpDown, ClipboardList, SlidersHorizontal, Settings2, CreditCard, Crown, Clock, LayoutDashboard, Home } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/contexts/AuthContext';
 
 const ROLE_LABEL: Record<string, string> = { OWNER: 'Proprietário', MANAGER: 'Gerente', AGENT: 'Colaborador' };
 
 const navItems = [
-  { to: '/dashboard', icon: Building2, label: 'Imóveis', end: true },
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', end: true },
+  { to: '/imoveis', icon: Home, label: 'Imóveis' },
   { to: '/agents', icon: UserCog, label: 'Agentes' },
   { to: '/appointments', icon: Calendar, label: 'Agendamentos' },
   { to: '/screening', icon: ClipboardList, label: 'Triagem' },
