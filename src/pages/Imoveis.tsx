@@ -75,7 +75,7 @@ function PropertyRow({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, delay: index * 0.04, ease: [0.16, 1, 0.3, 1] }}
       className="group border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors cursor-pointer"
-      onClick={() => navigate(`/imoveis/${property.id}`)}
+      onClick={() => navigate(`/properties/${property.id}`)}
     >
       {/* Property name + image */}
       <td className="px-4 py-3.5">

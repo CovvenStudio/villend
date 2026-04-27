@@ -25,31 +25,6 @@ import AddPropertyDialog from '@/components/dashboard/AddPropertyDialog';
 import EditPropertyDialog from '@/components/dashboard/EditPropertyDialog';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import LeadDetailSheet from '@/components/dashboard/LeadDetailSheet';
-import dashboardImage1 from '@/assets/dashboard/img1.jpg';
-import dashboardImage2 from '@/assets/dashboard/img2.jpg';
-import dashboardImage3 from '@/assets/dashboard/img3.jpg';
-import dashboardImage4 from '@/assets/dashboard/img4.jpg';
-import dashboardImage5 from '@/assets/dashboard/img5.jpg';
-
-const DASHBOARD_IMAGES = [dashboardImage1, dashboardImage2, dashboardImage3, dashboardImage4, dashboardImage5];
-
-function getDashboardImageIndexForPageLoad() {
-  if (typeof window === 'undefined') return 0;
-
-  try {
-    const stored = window.localStorage.getItem('vyllad-dashboard-image-index');
-    const previousIndex = stored ? Number.parseInt(stored, 10) : -1;
-    const nextIndex = Number.isNaN(previousIndex)
-      ? 0
-      : (previousIndex + 1) % DASHBOARD_IMAGES.length;
-
-    window.localStorage.setItem('vyllad-dashboard-image-index', String(nextIndex));
-    return nextIndex;
-  } catch {
-    return 0;
-  }
-}
-
 // Adapts PropertyDto (API) to the Property shape expected by internal components
 function toProperty(dto: PropertyDto): Property {
   return {
@@ -595,10 +570,8 @@ export default function Dashboard() {
   const property = filteredProperties.find(p => p.id === effectiveSelected) ?? null;
 
   const { candidates, scoringConfig, loading: leadsLoading, setStatus: setLeadStatus, refresh: refreshLeads } = useLeads(effectiveSelected);
-  const [backgroundReady, setBackgroundReady] = useState(false);
   const [hasBootstrapped, setHasBootstrapped] = useState(false);
   const [isSwitchingProperty, setIsSwitchingProperty] = useState(false);
-  const [dashboardImageIndex] = useState(getDashboardImageIndexForPageLoad);
   const transitionStartedAtRef = useRef<number>(Date.now());
 
   const propertyCandidates = useMemo(() => {
@@ -679,31 +652,8 @@ export default function Dashboard() {
 
   const propertyAgents = realAgents.filter(a => property?.agentIds.includes(a.id));
   const propertyAppointments = mockAppointments.filter(a => a.propertyId === effectiveSelected);
-  const backgroundImageSrc = DASHBOARD_IMAGES[dashboardImageIndex];
-  const isDataReady = !propertiesLoading && (!effectiveSelected || !leadsLoading) && backgroundReady;
+  const isDataReady = !propertiesLoading && (!effectiveSelected || !leadsLoading);
   const showInitialSplash = !hasBootstrapped;
-
-  useEffect(() => {
-    setBackgroundReady(false);
-
-    const image = new Image();
-    image.src = backgroundImageSrc;
-
-    const markReady = () => setBackgroundReady(true);
-
-    if (image.complete) {
-      markReady();
-      return;
-    }
-
-    image.onload = markReady;
-    image.onerror = markReady;
-
-    return () => {
-      image.onload = null;
-      image.onerror = null;
-    };
-  }, [backgroundImageSrc]);
 
   useEffect(() => {
     if (!hasBootstrapped && isDataReady) {
@@ -746,37 +696,7 @@ export default function Dashboard() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.36, ease: [0.16, 1, 0.3, 1] }}
           >
-            {/* ── Relative wrapper so background stays within content ──────────── */}
-            <div className="relative min-h-screen">
-
-              {/* ── Background image (absolute, scrolls with content) ─────────── */}
-              <div className="absolute inset-0 -z-10 overflow-hidden">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={effectiveSelected ?? 'no-property'}
-                    initial={{ opacity: 0, scale: 1.06 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
-                    className="absolute inset-0"
-                  >
-                    <img
-                      src={backgroundImageSrc}
-                      alt=""
-                      className="absolute inset-0 w-full h-full object-cover object-center scale-110 blur-2xl opacity-45"
-                    />
-                    <img
-                      src={backgroundImageSrc}
-                      alt=""
-                      className="w-full h-full object-cover object-center scale-[1.02] opacity-90"
-                    />
-                  </motion.div>
-                </AnimatePresence>
-                <div className="absolute inset-0 bg-black/55" />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/42 via-black/18 to-black/52" />
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_18%,rgba(0,0,0,0.18)_60%,rgba(0,0,0,0.38)_100%)]" />
-              </div>
-
+            <div className="min-h-screen">
               <AnimatePresence>
                 {isSwitchingProperty && (
                   <motion.div
@@ -815,12 +735,12 @@ export default function Dashboard() {
                     className="flex items-start justify-between mb-6 gap-4"
                   >
                     <div>
-                      <p className="text-white/40 text-xs font-medium uppercase tracking-widest mb-1">Dashboard</p>
-                      <h1 className="font-display text-2xl md:text-3xl font-700 tracking-tight text-white leading-tight">
+                      <p className="text-muted-foreground text-xs font-medium uppercase tracking-widest mb-1">Dashboard</p>
+                      <h1 className="font-display text-2xl md:text-3xl font-700 tracking-tight text-foreground leading-tight">
                         {property?.title ?? 'Imóveis'}
                       </h1>
                       {(property?.rentalPrice ?? property?.price) && (
-                        <p className="text-white/50 text-sm mt-0.5">
+                        <p className="text-muted-foreground text-sm mt-0.5">
                           €{(property.rentalPrice ?? property.price)?.toLocaleString('pt-PT')}/mês
                           {selectedPropertyDto?.status === 'PAUSED' && (
                             <span className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 ring-1 ring-amber-400/30">Pausado</span>
@@ -831,7 +751,7 @@ export default function Dashboard() {
                     <Button
                       onClick={() => setAddOpen(true)}
                       size="sm"
-                      className="shrink-0 gap-2 rounded-full bg-white/15 backdrop-blur-md hover:bg-white/25 text-white border-0 ring-1 ring-white/20 font-semibold"
+                      className="shrink-0 gap-2 rounded-full font-semibold"
                     >
                       <Plus className="w-4 h-4" />
                       <span className="hidden sm:inline">Novo imóvel</span>
@@ -847,28 +767,28 @@ export default function Dashboard() {
               {/* Property selector bar */}
               <div className="flex flex-wrap items-center gap-2 mb-6">
                 {/* Active/closed toggle */}
-                <div className="flex items-center gap-1 p-1 rounded-full bg-white/10 backdrop-blur-md ring-1 ring-white/15 shrink-0">
+                <div className="flex items-center gap-1 p-1 rounded-full bg-muted ring-1 ring-border shrink-0">
                   <button
                     onClick={() => { setPropertyStatusFilter('active'); handleSelectProperty(null); }}
                     className={`text-xs font-semibold px-3 py-1 rounded-full transition-all ${
-                      propertyStatusFilter === 'active' ? 'bg-white text-black shadow' : 'text-white/70 hover:text-white'
+                      propertyStatusFilter === 'active' ? 'bg-background text-foreground shadow' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >Ativos</button>
                   <button
                     onClick={() => { setPropertyStatusFilter('closed'); handleSelectProperty(null); }}
                     className={`text-xs font-semibold px-3 py-1 rounded-full transition-all ${
-                      propertyStatusFilter === 'closed' ? 'bg-white text-black shadow' : 'text-white/70 hover:text-white'
+                      propertyStatusFilter === 'closed' ? 'bg-background text-foreground shadow' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >Encerrados</button>
                 </div>
                 {/* Property selector */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="flex order-3 sm:order-none basis-full sm:basis-auto items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 backdrop-blur-md ring-1 ring-white/20 text-white hover:bg-white/25 transition-all outline-none w-full sm:w-[360px] max-w-full min-w-0">
+                    <button className="flex order-3 sm:order-none basis-full sm:basis-auto items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-border text-foreground hover:bg-muted transition-all outline-none w-full sm:w-[360px] max-w-full min-w-0">
                       {property?.images?.[0] ? (
                         <img src={property.images[0]} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />
                       ) : (
-                        <Home className="w-3.5 h-3.5 shrink-0 text-white/60" />
+                        <Home className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
                       )}
                       <span className="text-xs font-semibold truncate flex-1 min-w-0 text-left">
                         {property?.title ?? 'Selecionar imóvel'}
@@ -912,7 +832,7 @@ export default function Dashboard() {
                     <Link
                       to={`/p/${property.slug}`}
                       target="_blank"
-                      className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md text-white hover:bg-white/20 transition-all ring-1 ring-white/15"
+                      className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border border-border bg-white text-foreground hover:bg-muted transition-all"
                     >
                       <Eye className="w-3.5 h-3.5" />
                       <span className="hidden sm:inline">Ver página</span>
@@ -921,7 +841,7 @@ export default function Dashboard() {
                   {selectedPropertyDto && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-white/10 backdrop-blur-md hover:bg-white/20 text-white ring-1 ring-white/15 border-0">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full border border-border bg-white hover:bg-muted">
                           <MoreHorizontal className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -964,7 +884,7 @@ export default function Dashboard() {
                           alt={a.name}
                           title={a.name}
                           referrerPolicy="no-referrer"
-                          className="w-7 h-7 rounded-full object-cover ring-2 ring-white/20"
+                          className="w-7 h-7 rounded-full object-cover ring-2 ring-background"
                         />
                       ))}
                     </div>
@@ -1029,9 +949,9 @@ export default function Dashboard() {
 
                   {/* Filters + Lead list */}
                   <div className="flex flex-wrap gap-2.5 mb-5 items-center">
-                    <h2 className="font-display font-700 text-base flex-1 text-white">
+                    <h2 className="font-display font-700 text-base flex-1 text-foreground">
                       Todos os candidatos
-                      <span className="ml-2 text-sm font-400 text-white/50 font-sans">
+                      <span className="ml-2 text-sm font-400 text-muted-foreground font-sans">
                         ({propertyCandidates.length})
                       </span>
                     </h2>

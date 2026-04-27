@@ -8,7 +8,7 @@ const ROLE_LABEL: Record<string, string> = { OWNER: 'Proprietário', MANAGER: 'G
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', end: true },
-  { to: '/imoveis', icon: Home, label: 'Imóveis' },
+  { to: '/properties', icon: Home, label: 'Imóveis' },
   { to: '/agents', icon: UserCog, label: 'Agentes' },
   { to: '/appointments', icon: Calendar, label: 'Agendamentos' },
   { to: '/screening', icon: ClipboardList, label: 'Triagem' },

@@ -53,8 +53,8 @@ const App = () => (
               <Route path="/checkout/success" element={<ProtectedRoute><CheckoutReturn /></ProtectedRoute>} />
               <Route path="/invite/:token" element={<AcceptInvite />} />
               <Route path="/dashboard" element={<ProtectedRoute><SubscriptionGuard><Dashboard /></SubscriptionGuard></ProtectedRoute>} />
-              <Route path="/imoveis" element={<ProtectedRoute><SubscriptionGuard><Imoveis /></SubscriptionGuard></ProtectedRoute>} />
-              <Route path="/imoveis/:id" element={<ProtectedRoute><SubscriptionGuard><PropertyDetail /></SubscriptionGuard></ProtectedRoute>} />
+              <Route path="/properties" element={<ProtectedRoute><SubscriptionGuard><Imoveis /></SubscriptionGuard></ProtectedRoute>} />
+              <Route path="/properties/:id" element={<ProtectedRoute><SubscriptionGuard><PropertyDetail /></SubscriptionGuard></ProtectedRoute>} />
               <Route path="/agents" element={<ProtectedRoute><SubscriptionGuard><Agents /></SubscriptionGuard></ProtectedRoute>} />
               <Route path="/appointments" element={<ProtectedRoute><SubscriptionGuard><Appointments /></SubscriptionGuard></ProtectedRoute>} />
               <Route path="/screening" element={<ProtectedRoute><SubscriptionGuard><LeadFormSettings /></SubscriptionGuard></ProtectedRoute>} />
